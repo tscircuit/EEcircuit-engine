@@ -9,11 +9,11 @@ NGSPICE_HOME="https://github.com/danchitnis/ngspice-sf-mirror"
 echo "build: ngsice git repository is $NGSPICE_HOME"
 
 cd /opt
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk
-./emsdk install latest
-./emsdk activate latest
-source ./emsdk_env.sh
+if [ -d emsdk ]; then
+  cd emsdk
+  source ./emsdk_env.sh
+fi
+command -v emconfigure >/dev/null || { echo "build: emconfigure is unavailable, stopping execution"; exit 1; }
 
 echo "build: emscripten is installed"
 
@@ -107,10 +107,182 @@ wait
 # Emscripten it cannot read the host source tree paths used below.
 make -C src/xspice/cmpp CC=gcc CFLAGS="-O2" LDFLAGS="" LIBS="" ifs_yacc.c mod_yacc.c cmpp || { echo "build: Native cmpp build failed, stopping execution"; exit 1; }
 
+echo "build: Building static XSPICE code models..."
+emmake make -C src/xspice/icm > /tmp/xspice-icm-build.log 2>&1 || { echo "build: XSPICE code model build failed, stopping execution"; tail -200 /tmp/xspice-icm-build.log; exit 1; }
+
+cat > src/xspice/icm/eecircuit_static_icm.c <<'EOF'
+#include <stdarg.h>
+#include <stdio.h>
+
+#include "ngspice/devdefs.h"
+#include "ngspice/cmtypes.h"
+#include "ngspice/evtudn.h"
+#include "ngspice/inertial.h"
+
+int add_device(int n, SPICEdev **devs, int flag);
+int add_udn(int n, Evt_Udn_Info_t **udns);
+
+FILE *fopen_with_path(const char *path, const char *mode) {
+  return fopen(path, mode);
+}
+
+int cm_message_printf(const char *fmt, ...) {
+  int result;
+  va_list args;
+
+  va_start(args, fmt);
+  result = vfprintf(stderr, fmt, args);
+  va_end(args);
+  fputc('\n', stderr);
+
+  return result;
+}
+
+Mif_Boolean_t cm_is_inertial(enum param_vals param) {
+  if (param == Not_set) {
+    return 1;
+  }
+  return param == On ? 1 : 0;
+}
+
+#include "spice2poly/cmextrn.h"
+#include "spice2poly/udnextrn.h"
+SPICEdev *eecircuit_spice2poly_devices[] = {
+#include "spice2poly/cminfo.h"
+  NULL
+};
+Evt_Udn_Info_t *eecircuit_spice2poly_udns[] = {
+#include "spice2poly/udninfo.h"
+  NULL
+};
+int eecircuit_spice2poly_device_count = sizeof(eecircuit_spice2poly_devices) / sizeof(SPICEdev *) - 1;
+int eecircuit_spice2poly_udn_count = sizeof(eecircuit_spice2poly_udns) / sizeof(Evt_Udn_Info_t *) - 1;
+
+#include "digital/cmextrn.h"
+#include "digital/udnextrn.h"
+SPICEdev *eecircuit_digital_devices[] = {
+#include "digital/cminfo.h"
+  NULL
+};
+Evt_Udn_Info_t *eecircuit_digital_udns[] = {
+#include "digital/udninfo.h"
+  NULL
+};
+int eecircuit_digital_device_count = sizeof(eecircuit_digital_devices) / sizeof(SPICEdev *) - 1;
+int eecircuit_digital_udn_count = sizeof(eecircuit_digital_udns) / sizeof(Evt_Udn_Info_t *) - 1;
+
+#include "analog/cmextrn.h"
+#include "analog/udnextrn.h"
+SPICEdev *eecircuit_analog_devices[] = {
+#include "analog/cminfo.h"
+  NULL
+};
+Evt_Udn_Info_t *eecircuit_analog_udns[] = {
+#include "analog/udninfo.h"
+  NULL
+};
+int eecircuit_analog_device_count = sizeof(eecircuit_analog_devices) / sizeof(SPICEdev *) - 1;
+int eecircuit_analog_udn_count = sizeof(eecircuit_analog_udns) / sizeof(Evt_Udn_Info_t *) - 1;
+
+#include "xtradev/cmextrn.h"
+#include "xtradev/udnextrn.h"
+SPICEdev *eecircuit_xtradev_devices[] = {
+#include "xtradev/cminfo.h"
+  NULL
+};
+Evt_Udn_Info_t *eecircuit_xtradev_udns[] = {
+#include "xtradev/udninfo.h"
+  NULL
+};
+int eecircuit_xtradev_device_count = sizeof(eecircuit_xtradev_devices) / sizeof(SPICEdev *) - 1;
+int eecircuit_xtradev_udn_count = sizeof(eecircuit_xtradev_udns) / sizeof(Evt_Udn_Info_t *) - 1;
+
+#include "xtraevt/cmextrn.h"
+#include "xtraevt/udnextrn.h"
+SPICEdev *eecircuit_xtraevt_devices[] = {
+#include "xtraevt/cminfo.h"
+  NULL
+};
+Evt_Udn_Info_t *eecircuit_xtraevt_udns[] = {
+#include "xtraevt/udninfo.h"
+  NULL
+};
+int eecircuit_xtraevt_device_count = sizeof(eecircuit_xtraevt_devices) / sizeof(SPICEdev *) - 1;
+int eecircuit_xtraevt_udn_count = sizeof(eecircuit_xtraevt_udns) / sizeof(Evt_Udn_Info_t *) - 1;
+
+#include "table/cmextrn.h"
+#include "table/udnextrn.h"
+SPICEdev *eecircuit_table_devices[] = {
+#include "table/cminfo.h"
+  NULL
+};
+Evt_Udn_Info_t *eecircuit_table_udns[] = {
+#include "table/udninfo.h"
+  NULL
+};
+int eecircuit_table_device_count = sizeof(eecircuit_table_devices) / sizeof(SPICEdev *) - 1;
+int eecircuit_table_udn_count = sizeof(eecircuit_table_udns) / sizeof(Evt_Udn_Info_t *) - 1;
+
+#include "tlines/cmextrn.h"
+#include "tlines/udnextrn.h"
+SPICEdev *eecircuit_tlines_devices[] = {
+#include "tlines/cminfo.h"
+  NULL
+};
+Evt_Udn_Info_t *eecircuit_tlines_udns[] = {
+#include "tlines/udninfo.h"
+  NULL
+};
+int eecircuit_tlines_device_count = sizeof(eecircuit_tlines_devices) / sizeof(SPICEdev *) - 1;
+int eecircuit_tlines_udn_count = sizeof(eecircuit_tlines_udns) / sizeof(Evt_Udn_Info_t *) - 1;
+
+static void register_code_model_set(
+  int device_count,
+  SPICEdev **devices,
+  int udn_count,
+  Evt_Udn_Info_t **udns
+) {
+  if (device_count > 0) {
+    add_device(device_count, devices, 1);
+  }
+  if (udn_count > 0) {
+    add_udn(udn_count, udns);
+  }
+}
+
+int eecircuit_register_static_xspice_icm(void) {
+  register_code_model_set(eecircuit_spice2poly_device_count, eecircuit_spice2poly_devices, eecircuit_spice2poly_udn_count, eecircuit_spice2poly_udns);
+  register_code_model_set(eecircuit_digital_device_count, eecircuit_digital_devices, eecircuit_digital_udn_count, eecircuit_digital_udns);
+  register_code_model_set(eecircuit_analog_device_count, eecircuit_analog_devices, eecircuit_analog_udn_count, eecircuit_analog_udns);
+  register_code_model_set(eecircuit_xtradev_device_count, eecircuit_xtradev_devices, eecircuit_xtradev_udn_count, eecircuit_xtradev_udns);
+  register_code_model_set(eecircuit_xtraevt_device_count, eecircuit_xtraevt_devices, eecircuit_xtraevt_udn_count, eecircuit_xtraevt_udns);
+  register_code_model_set(eecircuit_table_device_count, eecircuit_table_devices, eecircuit_table_udn_count, eecircuit_table_udns);
+  register_code_model_set(eecircuit_tlines_device_count, eecircuit_tlines_devices, eecircuit_tlines_udn_count, eecircuit_tlines_udns);
+  return 0;
+}
+EOF
+
+emcc \
+  -I./src/include \
+  -I../src/include \
+  -I./src/xspice/icm \
+  -O2 \
+  -c ./src/xspice/icm/eecircuit_static_icm.c \
+  -o ./src/xspice/icm/eecircuit_static_icm.o || { echo "build: Static XSPICE registry build failed, stopping execution"; exit 1; }
+echo "build: Static XSPICE registry symbols:"
+NM_TOOL="$(command -v "${NM:-llvm-nm}" || command -v llvm-nm-19)"
+"$NM_TOOL" ./src/xspice/icm/eecircuit_static_icm.o | grep -E 'eecircuit_register_static_xspice_icm|fopen_with_path|cm_message_printf|cm_is_inertial' || { echo "build: Static XSPICE registry symbols missing, stopping execution"; exit 1; }
+
+sed -i '/extern struct coreInfo_t  coreInfo;/a int eecircuit_register_static_xspice_icm(void);' ../src/spicelib/devices/dev.c
+sed -i '/DEVices\[i\] = static_devices\[i\]();/a\\#ifdef XSPICE\n    eecircuit_register_static_xspice_icm();\n#endif' ../src/spicelib/devices/dev.c
+
+STATIC_ICM_OBJECTS="$(cd src && find xspice/icm -type f \( -name 'cfunc.o' -o -name 'ifspec.o' -o -name 'udnfunc.o' \) -print | sort | tr '\n' ' ')"
+STATIC_ICM_OBJECTS="xspice/icm/eecircuit_static_icm.o xspice/icm/dstring.o xspice/icm/tline_common.o xspice/icm/msline_common.o $STATIC_ICM_OBJECTS"
+WASM_LINK_FLAGS='-O2 -s ASYNCIFY=1 -s ASYNCIFY_ADVISE=0 -s ASYNCIFY_IGNORE_INDIRECT=0 -s ENVIRONMENT="web,worker" -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=["FS","Asyncify","callMain"] --pre-js /mnt/pre.js -o spice.mjs'
+
 # ngspice$(EXEEXT)
-sed -i 's|$(ngspice_LDADD) $(LIBS)|$(ngspice_LDADD) $(LIBS) -O2 -s ASYNCIFY=1 -s ASYNCIFY_ADVISE=0 -s ASYNCIFY_IGNORE_INDIRECT=0 -s ENVIRONMENT="web,worker" -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=["FS","Asyncify","callMain"] --pre-js /mnt/pre.js -o spice.mjs|g' ./src/Makefile
-
-
+sed -i '/$(ngspice_LINK) $(ngspice_OBJECTS)/s|$(LIBS)|'"$STATIC_ICM_OBJECTS"' $(LIBS) '"$WASM_LINK_FLAGS"'|' ./src/Makefile
+grep -q 'spice.mjs' ./src/Makefile || { echo "build: ngspice wasm link patch failed, stopping execution"; exit 1; }
 
 emmake make -j || { echo "build: Make failed, stopping execution"; exit 1; }
 #emmake make 2>&1 | tee make.log
@@ -133,5 +305,3 @@ echo "build: Build artifacts are copied to /mnt/build"
 
 echo -e "\n"
 echo -e "build: Docker script is ended\n"
-
-
