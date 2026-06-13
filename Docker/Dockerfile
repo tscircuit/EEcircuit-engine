@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
   wget \
   curl \
   bison \
+  flex \
   python3
 
 RUN apt-get -y install autoconf automake bzip2
@@ -37,7 +38,6 @@ ENTRYPOINT ["/run.sh"]
 
 ## run this command in WSL2:
 ## docker run -it -e VERSION=next -v $(realpath .):/mnt ngspice:emcc
-
 
 
 

@@ -100,8 +100,12 @@ echo "build: Building ngspice..."
 mkdir release
 cd release
 
-emconfigure ../configure --disable-debug --disable-openmp --disable-xspice --disable-osdi --without-x -with-readline=no
+emconfigure ../configure --disable-debug --disable-openmp --disable-osdi --without-x -with-readline=no
 wait
+
+# cmpp is a build-time generator used by XSPICE. If it is built with
+# Emscripten it cannot read the host source tree paths used below.
+make -C src/xspice/cmpp CC=gcc CFLAGS="-O2" LDFLAGS="" LIBS="" ifs_yacc.c mod_yacc.c cmpp || { echo "build: Native cmpp build failed, stopping execution"; exit 1; }
 
 # ngspice$(EXEEXT)
 sed -i 's|$(ngspice_LDADD) $(LIBS)|$(ngspice_LDADD) $(LIBS) -O2 -s ASYNCIFY=1 -s ASYNCIFY_ADVISE=0 -s ASYNCIFY_IGNORE_INDIRECT=0 -s ENVIRONMENT="web,worker" -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=["FS","Asyncify","callMain"] --pre-js /mnt/pre.js -o spice.mjs|g' ./src/Makefile
@@ -129,8 +133,5 @@ echo "build: Build artifacts are copied to /mnt/build"
 
 echo -e "\n"
 echo -e "build: Docker script is ended\n"
-
-
-
 
 
