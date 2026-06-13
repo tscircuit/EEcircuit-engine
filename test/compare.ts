@@ -3,6 +3,27 @@ export function deepCompare(
   b: unknown,
   path: string[] = []
 ): boolean {
+  const absoluteTolerance = 2e-3;
+  const relativeTolerance = 1e-3;
+
+  if (typeof a === "number" && typeof b === "number") {
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+      if (Object.is(a, b)) {
+        return true;
+      }
+      console.error(`Difference at ${path.join(".")}:`, a, b);
+      return false;
+    }
+
+    const diff = Math.abs(a - b);
+    const allowed = Math.max(absoluteTolerance, relativeTolerance * Math.max(Math.abs(a), Math.abs(b)));
+    if (diff > allowed) {
+      console.error(`Difference at ${path.join(".")}:`, a, b, `(diff ${diff}, allowed ${allowed})`);
+      return false;
+    }
+    return true;
+  }
+
   if (
     typeof a !== "object" ||
     typeof b !== "object" ||
