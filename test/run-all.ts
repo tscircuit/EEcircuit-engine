@@ -47,6 +47,14 @@ async function main() {
         console.log("\n--- Testing Package ---");
         await runCommand("npx", ["tsx", "test/test-package.ts", ...args]);
 
+        // 3.5 Test package PSpice/XSPICE compatibility path
+        console.log("\n--- Testing Package PSA TPS63802 ---");
+        await runCommand("npx", ["tsx", "test/test-package-psa-tps63802.ts"]);
+
+        // 3.7 Test figure plot SVG fixture regression
+        console.log("\n--- Testing TPS63802 Scope SVG Regression ---");
+        await runCommand("npx", ["tsx", "test/test-tps63802-scope-svg.ts"]);
+
         // 4. Test Browser
         console.log("\n--- Testing Browser ---");
         const browserEnv = { ...process.env };

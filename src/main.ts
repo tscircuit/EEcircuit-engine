@@ -1,4 +1,5 @@
 import { Simulation } from "./simulationLink.ts";
+import type { SimulationOptions } from "./simulationLink.ts";
 import type {
   ResultType,
   RealNumber,
@@ -14,4 +15,5 @@ export {
   ComplexNumber,
   RealDataType,
   ComplexDataType,
+  SimulationOptions,
 };

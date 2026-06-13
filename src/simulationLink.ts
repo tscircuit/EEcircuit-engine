@@ -12,6 +12,15 @@ import { readOutput, ResultType } from "./readOutput.ts";
 import { gf180 } from "./models/gf180/gf180.ts";
 import { gf180mos } from "./models/gf180/gf180mos.ts";
 
+export type SimulationOptions = {
+  /**
+   * ngspice compatibility mode, for example "psa" for broad PSpice syntax.
+   * The command is issued before sourcing the circuit so parser behavior is active
+   * while the netlist is read.
+   */
+  ngBehavior?: string;
+};
+
 export class Simulation {
   private static readonly MAX_INFO_CHARS = 2_000_000;
 
@@ -21,8 +30,9 @@ export class Simulation {
 
   private pass = false;
   // private commandList = [" ", "source test.cir", "run", "set filetype=ascii", "write out.raw"];
-  private commandList = [" ", "source test.cir", "destroy all", "run", "write out.raw"];
+  private commandList: string[] = [];
   private isNoiseMode = false;
+  private ngBehavior: string | null = null;
   private cmd = 0;
   private dataRaw: Uint8Array = new Uint8Array();
   private results: ResultType = {} as ResultType;
@@ -40,6 +50,11 @@ export class Simulation {
   private startPromise: Promise<void> | null = null;
 
   private netList = "";
+
+  public constructor(options: SimulationOptions = {}) {
+    this.ngBehavior = options.ngBehavior?.trim() || null;
+    this.setCommandListForCurrentMode();
+  }
 
   // Promise resolvers for initialization and simulation run.
   private initPromiseResolve: (() => void) | null = null;
@@ -284,20 +299,26 @@ export class Simulation {
     this.netList = input;
 
     const hasNoiseAnalysis = /^\s*\.noise\b/im.test(input);
+    const isEnteringNoiseMode = hasNoiseAnalysis && !this.isNoiseMode;
+
+    if (hasNoiseAnalysis !== this.isNoiseMode) {
+      this.isNoiseMode = hasNoiseAnalysis;
+      this.setCommandListForCurrentMode();
+    }
+
     if (hasNoiseAnalysis) {
-      this.commandList = [" ", "source test.cir", "destroy all", "run", "setplot noise1", "write out.raw"];
-      if (!this.isNoiseMode) {
-        this.isNoiseMode = true;
+      if (isEnteringNoiseMode) {
         console.info(
           "[EEcircuit-engine] .noise analysis detected; activating noise export mode (setplot noise1 -> write out.raw)."
         );
       }
       return;
     }
+  };
 
-    // Reset to default command list when not running a .noise analysis.
-    this.isNoiseMode = false;
-    this.commandList = [" ", "source test.cir", "destroy all", "run", "write out.raw"];
+  public setNgBehavior = (ngBehavior: string | null): void => {
+    this.ngBehavior = ngBehavior?.trim() || null;
+    this.setCommandListForCurrentMode();
   };
 
   private setOutputEvent = (outputEvent: (out: string) => void): void => {
@@ -323,5 +344,23 @@ export class Simulation {
   private log_debug = (message?: unknown, ...optionalParams: unknown[]) => {
     const isDebug = false;
     if (isDebug) console.log("simLink-> ", message, optionalParams);
+  };
+
+  private setCommandListForCurrentMode = (): void => {
+    const commands = [" "];
+
+    if (this.ngBehavior) {
+      commands.push(`set ngbehavior=${this.ngBehavior}`);
+    }
+
+    commands.push("source test.cir", "destroy all", "run");
+
+    if (this.isNoiseMode) {
+      commands.push("setplot noise1");
+    }
+
+    commands.push("write out.raw");
+
+    this.commandList = commands;
   };
 }
