@@ -1,5 +1,5 @@
 {
-  "name": "eecircuit-engine",
+  "name": "@tscircuit/eecircuit-engine",
   "version": "1.7.0",
   "description": "EEcircuit's simulation engine",
   "repository": {
@@ -32,6 +32,9 @@
     "test:browser:all": "npx playwright test test/test-browser-regression.spec.mts"
   },
   "author": "Danial Chitnis",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
