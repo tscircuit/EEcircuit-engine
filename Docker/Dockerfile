@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
   wget \
   curl \
   bison \
+  flex \
   python3
 
 RUN apt-get -y install autoconf automake bzip2
@@ -21,6 +22,7 @@ RUN apt-get -y install libtool which
 
 ## Emscripten
 ## https://emscripten.org/docs/getting_started/downloads.html
+RUN apt-get update && apt-get -y install emscripten
 
 
 ## fix the bug in ngspice
@@ -37,8 +39,5 @@ ENTRYPOINT ["/run.sh"]
 
 ## run this command in WSL2:
 ## docker run -it -e VERSION=next -v $(realpath .):/mnt ngspice:emcc
-
-
-
 
 

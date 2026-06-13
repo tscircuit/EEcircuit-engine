@@ -142,3 +142,5 @@ temp
 
 test/python/output
 __pycache__
+
+*.diff.png

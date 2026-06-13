@@ -8,6 +8,7 @@ import type { ResultType } from "../src/readOutput.ts";
 export type SimulationInstance = {
     start(): Promise<void>;
     setNetList(input: string): void;
+    setNgBehavior?(ngBehavior: string | null): void;
     runSim(): Promise<ResultType>;
 };
 

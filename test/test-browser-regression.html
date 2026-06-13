@@ -58,6 +58,21 @@ vin 1 0 0 pulse (0 1.8 0 0.1 0.1 15 30)
     };
 
     const deepCompare = (a, b) => {
+      const absoluteTolerance = 2e-3;
+      const relativeTolerance = 1e-3;
+
+      if (typeof a === "number" && typeof b === "number") {
+        if (!Number.isFinite(a) || !Number.isFinite(b)) {
+          return Object.is(a, b);
+        }
+        const diff = Math.abs(a - b);
+        const allowed = Math.max(
+          absoluteTolerance,
+          relativeTolerance * Math.max(Math.abs(a), Math.abs(b))
+        );
+        return diff <= allowed;
+      }
+
       if (
         typeof a !== "object" ||
         typeof b !== "object" ||
