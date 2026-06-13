@@ -19,6 +19,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Create Empty Build Directory
+        run: mkdir -p Docker/build
+
+      - name: Build Docker Image
+        run: docker build --no-cache -t eecircuit ./Docker
+
+      - name: Run Docker Container
+        run: docker run -t -e VERSION=main -v $(realpath ./Docker):/mnt eecircuit
+
+      - name: Copy SPICE WASM files
+        run: |
+          cp ./Docker/build/spice.wasm ./src/spice.wasm
+          cp ./Docker/build/spice.js ./src/spice.js
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
