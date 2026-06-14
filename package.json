@@ -7,7 +7,8 @@
     "url": "https://github.com/eelab-dev/EEcircuit-engine"
   },
   "files": [
-    "dist"
+    "dist",
+    "+esm"
   ],
   "main": "./dist/eecircuit-engine.umd.cjs",
   "module": "./dist/eecircuit-engine.mjs",
