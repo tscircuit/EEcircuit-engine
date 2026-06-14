@@ -181,7 +181,6 @@ export class Simulation {
           try {
             this.dataRaw = module.FS?.readFile("out.raw") ?? new Uint8Array();
             this.results = readOutput(this.dataRaw);
-            this.results = readOutput(this.dataRaw);
             this.outputEvent(this.output); // external callback
             // Resolve the run promise with the results.
             if (this.runPromiseResolve) {

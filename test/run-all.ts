@@ -32,6 +32,10 @@ async function main() {
         console.log("\n--- Testing Source ---");
         await runCommand("npx", ["tsx", "test/test.ts", ...args]);
 
+        // 2.1 Test duplicate raw output parsing regression
+        console.log("\n--- Testing Raw Output Single Parse Regression ---");
+        await runCommand("npx", ["tsx", "test/test-raw-output-pressure-points.ts"]);
+
         // 2.3 Run an actual .noise simulation and validate header
         console.log("\n--- Running .noise simulation ---");
         await runCommand("npx", ["tsx", "test/test-noise-run.ts"]);
