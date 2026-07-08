@@ -36,6 +36,10 @@ async function main() {
         console.log("\n--- Testing Raw Output Single Parse Regression ---");
         await runCommand("npx", ["tsx", "test/test-raw-output-pressure-points.ts"]);
 
+        // 2.2 Ensure fatal ngspice failures reject runSim instead of hanging/resolving stale output
+        console.log("\n--- Testing runSim Error Rejection Regression ---");
+        await runCommand("npx", ["tsx", "test/test-run-sim-error-rejection.ts"]);
+
         // 2.3 Run an actual .noise simulation and validate header
         console.log("\n--- Running .noise simulation ---");
         await runCommand("npx", ["tsx", "test/test-noise-run.ts"]);
