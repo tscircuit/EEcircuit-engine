@@ -59,6 +59,7 @@ export class Simulation {
   // Promise resolvers for initialization and simulation run.
   private initPromiseResolve: (() => void) | null = null;
   private runPromiseResolve: ((result: ResultType) => void) | null = null;
+  private runPromiseReject: ((error: Error) => void) | null = null;
 
   // Promise resolver used to resume the internal simulation loop between runs.
   private continuePromiseResolve: (() => void) | null = null;
@@ -178,17 +179,19 @@ export class Simulation {
       module.Asyncify?.handleAsync(async () => {
         // If a simulation cycle is complete, i.e. the command list has been exhausted:
         if (this.cmd === 0) {
-          try {
-            this.dataRaw = module.FS?.readFile("out.raw") ?? new Uint8Array();
-            this.results = readOutput(this.dataRaw);
-            this.outputEvent(this.output); // external callback
-            // Resolve the run promise with the results.
-            if (this.runPromiseResolve) {
-              this.runPromiseResolve(this.results);
-              this.runPromiseResolve = null;
+          const fatalNgspiceError = this.getFatalNgspiceError();
+
+          if (fatalNgspiceError) {
+            this.rejectRunPromise(this.createRunError());
+          } else {
+            try {
+              this.dataRaw = module.FS?.readFile("out.raw") ?? new Uint8Array();
+              this.results = readOutput(this.dataRaw);
+              this.outputEvent(this.output); // external callback
+              this.resolveRunPromise(this.results);
+            } catch (e) {
+              this.rejectRunPromise(this.createRunError(e));
             }
-          } catch (e) {
-            this.log_debug(e);
           }
           this.log_debug("output completed");
         }
@@ -253,9 +256,11 @@ export class Simulation {
       this.info = "";
       this.error = [];
       this.results = {} as ResultType;
+      this.clearRawOutput();
 
-      const resultPromise = new Promise<ResultType>((resolve) => {
+      const resultPromise = new Promise<ResultType>((resolve, reject) => {
         this.runPromiseResolve = resolve;
+        this.runPromiseReject = reject;
       });
 
       this.log_debug("Triggering simulation run...");
@@ -287,6 +292,67 @@ export class Simulation {
       this.continuePromiseResolve = null;
       resolve();
     }
+  };
+
+  private clearRawOutput = (): void => {
+    this.dataRaw = new Uint8Array();
+
+    try {
+      this.spiceModule?.FS?.writeFile("/out.raw", new Uint8Array());
+    } catch (e) {
+      this.log_debug(e);
+    }
+  };
+
+  private resolveRunPromise = (result: ResultType): void => {
+    if (this.runPromiseResolve) {
+      this.runPromiseResolve(result);
+    }
+
+    this.runPromiseResolve = null;
+    this.runPromiseReject = null;
+  };
+
+  private rejectRunPromise = (error: Error): void => {
+    if (this.runPromiseReject) {
+      this.runPromiseReject(error);
+    }
+
+    this.runPromiseResolve = null;
+    this.runPromiseReject = null;
+  };
+
+  private getFatalNgspiceError = (): string | null => {
+    const hasFatalError = this.error.some(
+      (entry) =>
+        /^\s*Error\b/i.test(entry) ||
+        /Simulation interrupted due to error/i.test(entry)
+    );
+
+    return hasFatalError ? this.getNgspiceErrorDetails() : null;
+  };
+
+  private createRunError = (cause?: unknown): Error => {
+    const details =
+      this.getFatalNgspiceError() ??
+      (cause ? this.getNgspiceErrorDetails() : null);
+    const messageParts = ["ngspice simulation failed"];
+
+    if (details) {
+      messageParts.push(details);
+    }
+
+    if (cause instanceof Error) {
+      messageParts.push(`Failed to read simulation output: ${cause.message}`);
+    } else if (cause) {
+      messageParts.push(`Failed to read simulation output: ${String(cause)}`);
+    }
+
+    return new Error(messageParts.join("\n\n"));
+  };
+
+  private getNgspiceErrorDetails = (): string | null => {
+    return this.error.join("\n").trim() || null;
   };
 
   private outputEvent = (out: string) => {
