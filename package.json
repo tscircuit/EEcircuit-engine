@@ -10,13 +10,13 @@
     "dist",
     "+esm"
   ],
-  "main": "./dist/eecircuit-engine.umd.cjs",
+  "main": "./dist/eecircuit-engine.umd.js",
   "module": "./dist/eecircuit-engine.mjs",
   "exports": {
     ".": {
       "types": "./dist/main.d.ts",
       "import": "./dist/eecircuit-engine.mjs",
-      "require": "./dist/eecircuit-engine.cjs"
+      "require": "./dist/eecircuit-engine.umd.js"
     }
   },
   "scripts": {
