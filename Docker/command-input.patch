@@ -1,0 +1,39 @@
+diff --git a/src/main.c b/src/main.c
+--- a/src/main.c
++++ b/src/main.c
+@@ -6,6 +6,18 @@
+ 
+    The main routine for ngspice
+ */
++
++#include <emscripten.h>
++
++EM_ASYNC_JS(void, eecircuit_wait_for_input, (), {
++    if (Module["handleThings"])
++        await Module["handleThings"]();
++});
++
++EM_JS(char *, eecircuit_get_input, (), {
++    const command = Module["getInput"] ? Module["getInput"]() : null;
++    return command === null ? 0 : Module["stringToNewUTF8"](command);
++});
+ 
+ #include "ngspice/ngspice.h"
+ #include "ngspice/const.h"
+@@ -727,8 +739,14 @@
+     /* History gets written in ../fte/misccoms.c com_quit */
+ 
+ #else
+-    while (cp_evloop(NULL) == 1) {
+-        ;
++    for (;;) {
++        char *command;
++        eecircuit_wait_for_input();
++        command = eecircuit_get_input();
++        if (!command)
++            break;
++        cp_evloop(command);
++        free(command);
+     }
+ #endif /* defined(HAVE_GNUREADLINE) || defined(HAVE_BSDEDITLINE) */
+ } /* end of function app_rl_readlines */
