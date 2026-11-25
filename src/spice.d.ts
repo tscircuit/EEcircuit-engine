@@ -8,8 +8,8 @@ type ModuleType = {
   preRun: [() => void];
   FS?: FSType;
   Asyncify?: AsyncifyType;
-  setHandleThings: (handleThings: () => void) => void;
-  setGetInput: (getInput: () => void) => void;
+  setHandleThings: (handleThings: () => void | Promise<void>) => void;
+  setGetInput: (getInput: () => string | null) => void;
   runThings: () => void;
   print: (e?: any) => void;
   printErr: (e?: any) => void;
