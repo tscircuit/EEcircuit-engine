@@ -174,50 +174,48 @@ export class Simulation {
     module.FS?.writeFile("/modelcard.GF180.statistical", gf180 + "\n.lib sm141064.ngspice statistical\n");
 
     // Set the handler to process simulation events.
-    module.setHandleThings(() => {
+    module.setHandleThings(async () => {
       this.log_debug("handle other things!!!!!");
-      module.Asyncify?.handleAsync(async () => {
-        // If a simulation cycle is complete, i.e. the command list has been exhausted:
-        if (this.cmd === 0) {
-          const fatalNgspiceError = this.getFatalNgspiceError();
+      // If a simulation cycle is complete, i.e. the command list has been exhausted:
+      if (this.cmd === 0) {
+        const fatalNgspiceError = this.getFatalNgspiceError();
 
-          if (fatalNgspiceError) {
-            this.rejectRunPromise(this.createRunError());
-          } else {
-            try {
-              this.dataRaw = module.FS?.readFile("out.raw") ?? new Uint8Array();
-              this.results = readOutput(this.dataRaw);
-              this.outputEvent(this.output); // external callback
-              this.resolveRunPromise(this.results);
-            } catch (e) {
-              this.rejectRunPromise(this.createRunError(e));
-            }
+        if (fatalNgspiceError) {
+          this.rejectRunPromise(this.createRunError());
+        } else {
+          try {
+            this.dataRaw = module.FS?.readFile("out.raw") ?? new Uint8Array();
+            this.results = readOutput(this.dataRaw);
+            this.outputEvent(this.output); // external callback
+            this.resolveRunPromise(this.results);
+          } catch (e) {
+            this.rejectRunPromise(this.createRunError(e));
           }
-          this.log_debug("output completed");
         }
+        this.log_debug("output completed");
+      }
 
-        // On the very first run, resolve the initialization promise.
-        if (!this.initialized) {
-          if (this.initPromiseResolve) {
-            this.initPromiseResolve();
-            this.initPromiseResolve = null;
-          }
-          this.log_debug("initialized");
-          this.initialized = true;
-          this.initInfo = this.info;
+      // On the very first run, resolve the initialization promise.
+      if (!this.initialized) {
+        if (this.initPromiseResolve) {
+          this.initPromiseResolve();
+          this.initPromiseResolve = null;
         }
+        this.log_debug("initialized");
+        this.initialized = true;
+        this.initInfo = this.info;
+      }
 
-        // Wait for the next simulation trigger before continuing the loop.
-        if (this.cmd === 0) {
-          this.log_debug("waiting for next simulation trigger...");
-          await this.waitForNextRun();
-          // Prepare for the next cycle by writing the new netlist *before* commands restart.
-          module.FS?.writeFile("/test.cir", this.netList);
-        }
-        this.log_debug("Simulation loop finished for one run cycle");
+      // Wait for the next simulation trigger before continuing the loop.
+      if (this.cmd === 0) {
+        this.log_debug("waiting for next simulation trigger...");
+        await this.waitForNextRun();
+        // Prepare for the next cycle by writing the new netlist *before* commands restart.
+        module.FS?.writeFile("/test.cir", this.netList);
+      }
+      this.log_debug("Simulation loop finished for one run cycle");
 
-        this.pass = false;
-      });
+      this.pass = false;
     });
 
     module.setGetInput(this.getInput);

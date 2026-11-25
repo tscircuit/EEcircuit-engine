@@ -76,6 +76,8 @@ echo "build: Applying hicum2 removal patch"
 cp /hicum2_patch.sh ./hicum2_patch.sh
 ./hicum2_patch.sh || { echo "build: hicum2 patch failed, stopping execution"; exit 1; }
 
+git apply /command-input.patch || { echo "build: command input patch failed, stopping execution"; exit 1; }
+
 git apply /transient-numerics.patch || { echo "build: transient numerics patch failed, stopping execution"; exit 1; }
 
 ############################################
@@ -89,8 +91,6 @@ echo "build: Branch name is $(git branch --show-current)"
 #https://sourceforge.net/p/ngspice/patches/99/
 sed -i 's/-Wno-unused-but-set-variable/-Wno-unused-const-variable/g' ./configure.ac
 sed -i 's/AC_CHECK_FUNCS(\[time getrusage\])/AC_CHECK_FUNCS(\[time\])/g' ./configure.ac
-sed -i 's|#include "ngspice/ngspice.h"|#include <emscripten.h>\n\nEM_ASYNC_JS(void, eesim_sleep_hack, (), {\n    if (Module["handleThings"]) {\n        await new Promise((resolve) => {\n            Module["handleThings"]();\n        });\n    }\n});\n\n#include "ngspice/ngspice.h"|g' ./src/frontend/control.c
-sed -i 's|freewl = wlist = getcommand(string);|eesim_sleep_hack();\n\n\t\tfreewl = wlist = getcommand(string);|g' ./src/frontend/control.c
 
 
 ############################################
@@ -280,7 +280,8 @@ sed -i '/DEVices\[i\] = static_devices\[i\]();/a\\#ifdef XSPICE\n    eecircuit_r
 
 STATIC_ICM_OBJECTS="$(cd src && find xspice/icm -type f \( -name 'cfunc.o' -o -name 'ifspec.o' -o -name 'udnfunc.o' \) -print | sort | tr '\n' ' ')"
 STATIC_ICM_OBJECTS="xspice/icm/eecircuit_static_icm.o xspice/icm/dstring.o xspice/icm/tline_common.o xspice/icm/msline_common.o $STATIC_ICM_OBJECTS"
-WASM_LINK_FLAGS='-O2 -s ASYNCIFY=1 -s ASYNCIFY_ADVISE=0 -s ASYNCIFY_IGNORE_INDIRECT=0 -s ENVIRONMENT="web,worker" -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=["FS","Asyncify","callMain"] --pre-js /mnt/pre.js -o spice.mjs'
+# Only the top-level input bridge suspends; invoke_v is its setjmp trampoline.
+WASM_LINK_FLAGS='-O2 -s ASYNCIFY=1 -s ASYNCIFY_ADVISE=0 -s ASYNCIFY_IGNORE_INDIRECT=1 -s ASYNCIFY_IMPORTS=["invoke_v"] -s ENVIRONMENT="web,worker" -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORTED_RUNTIME_METHODS=["FS","Asyncify","callMain","stringToNewUTF8"] --pre-js /mnt/pre.js -o spice.mjs'
 
 # ngspice$(EXEEXT)
 sed -i '/$(ngspice_LINK) $(ngspice_OBJECTS)/s|$(LIBS)|'"$STATIC_ICM_OBJECTS"' $(LIBS) '"$WASM_LINK_FLAGS"'|' ./src/Makefile

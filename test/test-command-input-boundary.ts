@@ -7,14 +7,14 @@ async function main(): Promise<void> {
     const sim = new Simulation();
     await sim.start();
     const module = sim.__getSpiceModuleForTests() as {
-        handleThings(): void;
+        handleThings(): void | Promise<void>;
         getInput(): string;
     };
     let pauses = 0;
     let inputs = 0;
     const handleThings = module.handleThings;
     const getInput = module.getInput;
-    module.handleThings = () => { pauses++; handleThings(); };
+    module.handleThings = () => { pauses++; return handleThings(); };
     module.getInput = () => { inputs++; return getInput(); };
     sim.setNetList(`Command input boundary
 V1 output 0 1
@@ -32,7 +32,7 @@ echo end-control
     assert(result.dataType === "real");
     assert.equal(result.data.find((vector) => vector.name === "v(output)")?.values.at(-1), 1);
     assert(sim.getInfo().includes("end-control"));
-    assert.equal(pauses - inputs, 3, "Nested control commands also pause for external input");
+    assert.equal(pauses - inputs, 0, "Only external commands should pause for input");
     console.log(JSON.stringify({ pauses, inputs, extraPauses: pauses - inputs }));
 }
 
