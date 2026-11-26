@@ -1,11 +1,15 @@
 export function renderBuckStartupSvg(samples: { seconds: number[]; volts: number[]; method?: "gear" }): string {
+    const maximumVolts = samples.volts.reduce((maximum, volts) => Math.max(maximum, volts), 0);
+    const maximumMillivolts = Math.max(40, Math.ceil(maximumVolts * 10) * 100);
+    const pixelsPerMillivolt = 240 / maximumMillivolts;
     const stride = Math.ceil(samples.seconds.length / 600);
     const points = samples.seconds.flatMap((seconds, index) => {
         if (index % stride && index !== samples.seconds.length - 1) return [];
-        return [`${(80 + seconds * 16e6).toFixed(3)},${(350 - samples.volts[index] * 6000).toFixed(3)}`];
+        return [`${(80 + seconds * 16e6).toFixed(3)},${(350 - samples.volts[index] * 1000 * pixelsPerMillivolt).toFixed(3)}`];
     }).join(" ");
-    const ticks = [0, 10, 20, 30, 40].map((mv) => {
-        const y = 350 - mv * 6;
+    const ticks = [0, 1, 2, 3, 4].map((tick) => {
+        const mv = tick * maximumMillivolts / 4;
+        const y = 350 - mv * pixelsPerMillivolt;
         return `<line x1="80" y1="${y}" x2="880" y2="${y}" stroke="#e5e7eb"/><text x="65" y="${y + 5}" text-anchor="end">${mv}</text>`;
     }).join("");
     const times = [0, 10, 20, 30, 40, 50].map((us) => `<text x="${80 + us * 16}" y="378" text-anchor="middle">${us}</text>`).join("");
