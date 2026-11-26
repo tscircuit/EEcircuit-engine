@@ -90,7 +90,7 @@ export function renderLoadedPowerTreeSvg({ samples, reference, errorMessage }: {
 <g text-anchor="middle"><text x="90" y="878">0</text><text x="500" y="878">5</text><text x="910" y="878">10 µs</text></g>
 <text transform="translate(28 720) rotate(-90)" text-anchor="middle">Output voltage (V)</text>
 <text x="110" y="540" fill="#6b7280">Dashed: ngspice 47</text><text x="410" y="540" fill="#2563eb">Engine OUT12</text><text x="660" y="540" fill="#9333ea">Engine OUT18</text>
-<text x="500" y="912" text-anchor="middle" fill="${color}">${complete ? `Compared ${comparison.comparedPoints}/200 reference checkpoints; maximum error ${(comparison.maximumErrorVolts * 1000).toFixed(4)} mV` : "Solver aborted before completing the reference window."}</text>
+<text x="500" y="912" text-anchor="middle" fill="${color}">${complete ? `Compared ${comparison.comparedPoints}/200 reference checkpoints; maximum error ${(comparison.maximumErrorVolts * 1e6).toFixed(3)} µV` : "Solver aborted before completing the reference window."}</text>
 <text x="500" y="948" text-anchor="middle">Initial current loads discharge the capacitors before the upstream rails start.</text>
 <text x="500" y="978" text-anchor="middle">This tests initialization and convergence; the rail targets above are not settled values.</text>
 </g></svg>\n`;
