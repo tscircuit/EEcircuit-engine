@@ -1,7 +1,7 @@
 Loaded TI power tree with simultaneous output load edges
 * Exported with tscircuit0.0.3298 and its PSpice compatibility rewrite.
 * Model equations and component values retained; trailing whitespace trimmed.
-* Analysis reduced from20ms to100ns to capture the initial event failure.
+* First 10 us of the original 20 ms analysis, covering both early event failures.
 .SUBCKT library_simulation_spice_subcircuit_0 AGND DNC DNC_1 EN_SYNC FB PGND PGND_1 PGND_2 PGND_3 PGOOD RT SW SW_1 SW_2 VIN VOUT VOUT_1 VOUT_2
 *$
 * LMZM33602
@@ -3218,5 +3218,5 @@ Xsimulation_spice_subcircuit_3 N7 N9 0 0 N18 N7 N7 OUT18 0 library_simulation_sp
 * tscircuit_probe {"simulation_voltage_probe_id":"simulation_voltage_probe_1","name":"OUT18","spice_vector":"V(OUT18)","source_node_name":"OUT18"}
 .PRINT TRAN V(OUT12) V(OUT18)
 .SAVE V(OUT12) V(OUT18)
-.tran 1n 100n UIC
+.tran 1n 10u UIC
 .END
