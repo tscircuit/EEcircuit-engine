@@ -25,12 +25,12 @@ async function main(): Promise<void> {
     const samples = { timeSeconds, out12Volts, out18Volts };
     const reference: LoadedPowerTreeReference = JSON.parse(await readFile(new URL("./fixtures/loaded-ti-power-tree.native.json", import.meta.url), "utf8"));
     assert.equal(createHash("sha256").update(netList).digest("hex"), reference.netlistSha256, "Native reference input changed");
-    if (Math.abs(timeSeconds.at(-1)! - 10e-6) < 1e-18) {
-        const comparison = compareLoadedPowerTree(samples, reference);
-        assert.equal(comparison.comparedPoints, 200);
-        assert(comparison.maximumErrorVolts <= reference.maximumErrorVolts,
-            `Power tree differs from native ngspice by ${comparison.maximumErrorVolts} V`);
-    }
+    assert(Math.abs(timeSeconds.at(-1)! - 10e-6) < 1e-18, "Loaded power tree did not reach 10 µs");
+    assert(!sim.getError().some((message) => /too small|aborted|fatal/i.test(message)));
+    const waveformComparison = compareLoadedPowerTree(samples, reference);
+    assert.equal(waveformComparison.comparedPoints, 200);
+    assert(waveformComparison.maximumErrorVolts <= reference.maximumErrorVolts,
+        `Power tree differs from native ngspice by ${waveformComparison.maximumErrorVolts} V`);
     const errorMessage = sim.getError().find((message) => /timestep too small/i.test(message)) ?? "";
     const svg = renderLoadedPowerTreeSvg({ samples, reference, errorMessage });
     const snapshotUrl = new URL("./fixtures/loaded-ti-power-tree.expected.svg", import.meta.url);

@@ -92,12 +92,13 @@ diff --git a/src/spicelib/devices/cap/capacld.c b/src/spicelib/devices/cap/capac
 diff --git a/src/spicelib/devices/cap/capdefs.h b/src/spicelib/devices/cap/capdefs.h
 --- a/src/spicelib/devices/cap/capdefs.h
 +++ b/src/spicelib/devices/cap/capdefs.h
-@@ -29,6 +29,11 @@
+@@ -29,6 +29,12 @@
 
      const int CAPposNode; /* number of positive node of capacitor */
      const int CAPnegNode; /* number of negative node of capacitor */
 +
 +    int CAPbranch;
++    int CAPvoltageState;
 +    double CAPcompanionGeq;
 +    double *CAPposBranchPtr, *CAPnegBranchPtr;
 +    double *CAPbranchPosPtr, *CAPbranchNegPtr, *CAPbranchBranchPtr;
@@ -130,7 +131,23 @@ diff --git a/src/spicelib/devices/cap/capinit.c b/src/spicelib/devices/cap/capin
 diff --git a/src/spicelib/devices/cap/capload.c b/src/spicelib/devices/cap/capload.c
 --- a/src/spicelib/devices/cap/capload.c
 +++ b/src/spicelib/devices/cap/capload.c
-@@ -71,15 +71,33 @@
+@@ -64,22 +64,59 @@
+ #ifndef PREDICTOR
+                     }
+ #endif /* PREDICTOR */
++                    /* Preserve voltage history without the C*V/C round trip. */
++                    if (here->CAPbranch) {
++                        ckt->CKTstate0[here->CAPvoltageState] = vcap;
++                        if (ckt->CKTmode & MODEINITTRAN)
++                            ckt->CKTstate1[here->CAPvoltageState] = vcap;
++                    }
+                     error = NIintegrate(ckt,&geq,&ceq,here->CAPcapac,
+                                         here->CAPqcap);
+                     if(error) return(error);
++                    /* Use the same current for integration history and queries. */
++                    if (here->CAPbranch && geq != 0.0 && m != 0.0)
++                        ckt->CKTstate0[here->CAPccap] = geq * ckt->CKTrhsOld[here->CAPbranch];
+                     if(ckt->CKTmode & MODEINITTRAN) {
                          *(ckt->CKTstate1+here->CAPccap) =
                              *(ckt->CKTstate0+here->CAPccap);
                      }
@@ -148,7 +165,17 @@ diff --git a/src/spicelib/devices/cap/capload.c b/src/spicelib/devices/cap/caplo
 +                        *(here->CAPbranchPosPtr) += 1.0;
 +                        *(here->CAPbranchNegPtr) -= 1.0;
 +                        *(here->CAPbranchBranchPtr) -= 1.0;
-+                        ckt->CKTrhs[here->CAPbranch] -= ceq / geq;
++                        double historyVoltage = ckt->CKTstate1[here->CAPvoltageState];
++                        if (ckt->CKTintegrateMethod == TRAPEZOIDAL && ckt->CKTorder == 2)
++                            historyVoltage += ckt->CKTag[1] * ckt->CKTstate1[here->CAPccap] / geq;
++                        else if (ckt->CKTintegrateMethod == GEAR) {
++                            int order;
++                            for (order = 2; order <= ckt->CKTorder; order++)
++                                historyVoltage -= (ckt->CKTag[order] / ckt->CKTag[0]) *
++                                    (ckt->CKTstates[order][here->CAPvoltageState] -
++                                     ckt->CKTstate1[here->CAPvoltageState]);
++                        }
++                        ckt->CKTrhs[here->CAPbranch] += historyVoltage;
 +                    } else {
 +                        *(here->CAPposPosPtr) += m * geq;
 +                        *(here->CAPnegNegPtr) += m * geq;
@@ -185,7 +212,7 @@ diff --git a/src/spicelib/devices/cap/cappzld.c b/src/spicelib/devices/cap/cappz
 diff --git a/src/spicelib/devices/cap/capsetup.c b/src/spicelib/devices/cap/capsetup.c
 --- a/src/spicelib/devices/cap/capsetup.c
 +++ b/src/spicelib/devices/cap/capsetup.c
-@@ -111,6 +111,26 @@
+@@ -111,6 +111,27 @@
      return(E_NOMEM);\
  } } while(0)
 
@@ -203,6 +230,7 @@ diff --git a/src/spicelib/devices/cap/capsetup.c b/src/spicelib/devices/cap/caps
 +                    if (error) return error;
 +                    here->CAPbranch = branch_node->number;
 +                }
++                here->CAPvoltageState = (*states)++;
 +                TSTALLOC(CAPposBranchPtr,CAPposNode,CAPbranch);
 +                TSTALLOC(CAPnegBranchPtr,CAPnegNode,CAPbranch);
 +                TSTALLOC(CAPbranchPosPtr,CAPbranch,CAPposNode);
@@ -212,7 +240,7 @@ diff --git a/src/spicelib/devices/cap/capsetup.c b/src/spicelib/devices/cap/caps
              TSTALLOC(CAPposPosPtr,CAPposNode,CAPposNode);
              TSTALLOC(CAPnegNegPtr,CAPnegNode,CAPnegNode);
              TSTALLOC(CAPposNegPtr,CAPposNode,CAPnegNode);
-@@ -120,3 +140,17 @@
+@@ -120,3 +141,17 @@
      return(OK);
  }
 
@@ -575,16 +603,22 @@ diff --git a/src/spicelib/analysis/dctran.c b/src/spicelib/analysis/dctran.c
 
  #ifndef SHARED_MODULE
              ckt->CKTtime = ckt->CKTtime -ckt->CKTdelta;
-@@ -749,6 +760,8 @@
+@@ -749,9 +760,12 @@
                 - new delta by difference between by retracted time and breakpoint */
 
          past_breakpoint:
 +            g_mif_info.breakpoint.current = MIN(g_mif_info.breakpoint.current,
 +                                                g_mif_info.analogRetryTime);
              ckt->CKTsaveDelta = ckt->CKTdelta;
-             ckt->CKTtime -= ckt->CKTdelta;
-             ckt->CKTdelta = g_mif_info.breakpoint.current - ckt->CKTtime;
-@@ -798,6 +811,11 @@
+-            ckt->CKTtime -= ckt->CKTdelta;
+-            ckt->CKTdelta = g_mif_info.breakpoint.current - ckt->CKTtime;
++            if (g_mif_info.breakpoint.current != ckt->CKTtime)
++                ckt->CKTdelta = g_mif_info.breakpoint.current - (ckt->CKTtime - ckt->CKTdelta);
++            ckt->CKTtime -= ckt->CKTsaveDelta;
+             g_mif_info.breakpoint.last = ckt->CKTtime + ckt->CKTdelta;
+             xspice_breakpoints_processed = 1;
+
+@@ -798,6 +812,11 @@
                  UPDATE_STATS(DOING_TRAN);
                  return(error);
              }
@@ -596,16 +630,30 @@ diff --git a/src/spicelib/analysis/dctran.c b/src/spicelib/analysis/dctran.c
              if (newdelta > .9 * ckt->CKTdelta) {
  #if defined(XSPICE)
                  /* The timestep has succeeded.  XSPICE instances with
-@@ -885,6 +903,10 @@
-                 ckt->CKTstat->STATrejected ++;
+@@ -886,6 +905,10 @@
  #else
                  redostep = 1;
-+#endif
+ #endif
 +#ifdef XSPICE
 +                g_mif_info.analogStepRevision++;
 +                g_mif_info.analogEventRetry = 0;
- #endif
++#endif
                  ckt->CKTdelta = newdelta;
+ #ifdef STEPDEBUG
+                 (void)printf(
+@@ -896,7 +919,12 @@
+         /* Set the new delta to delmin (minimum delta allowed). However:
+            If the new delta has been less than the minimum delta
+            for the second time, bail out with 'Timestep too small'. */
+-        if (ckt->CKTdelta <= ckt->CKTdelmin) {
++        if (ckt->CKTdelta <= ckt->CKTdelmin
++#ifdef XSPICE
++            /* A converged same-point event correction is not a timestep cut. */
++            && !(xspice_breakpoints_processed && ckt->CKTdelta > 0.0 && ckt->CKTdelta == olddelta)
++#endif
++           ) {
+             if (olddelta > ckt->CKTdelmin) {
+                 ckt->CKTdelta = ckt->CKTdelmin;
  #ifdef STEPDEBUG
 diff --git a/src/spicelib/devices/asrc/asrcdefs.h b/src/spicelib/devices/asrc/asrcdefs.h
 --- a/src/spicelib/devices/asrc/asrcdefs.h
@@ -697,7 +745,8 @@ diff --git a/src/spicelib/devices/asrc/asrcdel.c b/src/spicelib/devices/asrc/asr
 diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/asrcconv.c
 --- a/src/spicelib/devices/asrc/asrcconv.c
 +++ b/src/spicelib/devices/asrc/asrcconv.c
-@@ -9,4 +9,8 @@
+@@ -8,6 +8,10 @@
+ #include "asrcdefs.h"
  #include "ngspice/sperror.h"
  #include "ngspice/suffix.h"
 +#include "ngspice/inpptree.h"
@@ -706,14 +755,18 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +#endif
 
 
-@@ -36,5 +40,5 @@
+ int
+@@ -35,7 +39,7 @@
+                 asrc_vals[i] = ckt->CKTrhs[here->ASRCvars[i]];
 
              if (here->ASRCtree->IFeval(here->ASRCtree, ckt->CKTgmin, &rhs,
 -                                       asrc_vals, asrc_derivs) != OK)
 +                                       asrc_vals, NULL) != OK)
                  return(E_BADPARM);
 
-@@ -59,2 +63,278 @@
+             prev = here->ASRCprev_value;
+@@ -58,3 +62,284 @@
+
      return(OK);
  }
 +
@@ -732,7 +785,7 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +    ASRCinstance *owner;
 +    CKTcircuit *ckt;
 +    void (*function)(void);
-+    double time, argument, value, rootTime;
++    double time, argument, value, rootTime, coincidentValue;
 +    double lo, hi, flo, fhi, wlo, whi;
 +    int side;
 +    ASRCrootState pending;
@@ -750,11 +803,14 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +    double root, scale;
 +    if (event->pending && event->revision != g_mif_info.analogStepRevision)
 +        event->pending = ASRC_ROOT_NONE;
++    if (event->pending == ASRC_ROOT_COINCIDENT)
++        value = event->coincidentValue;
 +    if (event->owner->ASRCeventMode == ASRC_EVENT_ACCEPT) {
 +        if (event->epoch == event->owner->ASRCeventEpoch)
 +            return value;
 +        event->time = ckt->CKTtime;
-+        event->argument = event->pending == ASRC_ROOT_LOCATED && event->rootTime == ckt->CKTtime ? 0.0 : argument;
++        event->argument = event->pending == ASRC_ROOT_COINCIDENT ||
++            (event->pending == ASRC_ROOT_LOCATED && event->rootTime == ckt->CKTtime) ? 0.0 : argument;
 +        event->value = value;
 +        event->valid = ckt->CKTtime > 0.0;
 +        event->epoch = event->owner->ASRCeventEpoch;
@@ -812,6 +868,8 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +                 * A whole bracket inside that interval is a coincident event. */
 +                if (event->hi <= event->time + ckt->CKTminBreak) {
 +                    event->pending = ASRC_ROOT_COINCIDENT;
++                    /* Keep the located side through the same-point retry. */
++                    event->coincidentValue = value;
 +                    if (ckt->CKTorder != 1) {
 +                        ckt->CKTnoncon++;
 +                        g_mif_info.analogRetryTime = MIN(g_mif_info.analogRetryTime, ckt->CKTtime);
@@ -848,7 +906,7 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +                    g_mif_info.analogRetryTime = MIN(g_mif_info.analogRetryTime, ckt->CKTtime);
 +                } else if (event->rootTime < ckt->CKTtime) {
 +                    g_mif_info.analogRetryTime = MIN(g_mif_info.analogRetryTime, event->rootTime);
-+                } else {
++                } else if (event->rootTime > ckt->CKTtime + ckt->CKTminBreak) {
 +                    g_mif_info.breakpoint.current = MIN(g_mif_info.breakpoint.current, event->rootTime);
 +                }
 +            }
