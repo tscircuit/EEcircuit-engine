@@ -1,18 +1,22 @@
-export function renderBuckStartupSvg(samples: { seconds: number[]; volts: number[] }): string {
+export function renderBuckStartupSvg(samples: { seconds: number[]; volts: number[]; method?: "gear" }): string {
+    const maximumVolts = samples.volts.reduce((maximum, volts) => Math.max(maximum, volts), 0);
+    const maximumMillivolts = Math.max(40, Math.ceil(maximumVolts * 10) * 100);
+    const pixelsPerMillivolt = 240 / maximumMillivolts;
     const stride = Math.ceil(samples.seconds.length / 600);
     const points = samples.seconds.flatMap((seconds, index) => {
         if (index % stride && index !== samples.seconds.length - 1) return [];
-        return [`${(80 + seconds * 16e6).toFixed(3)},${(350 - samples.volts[index] * 6000).toFixed(3)}`];
+        return [`${(80 + seconds * 16e6).toFixed(3)},${(350 - samples.volts[index] * 1000 * pixelsPerMillivolt).toFixed(3)}`];
     }).join(" ");
-    const ticks = [0, 10, 20, 30, 40].map((mv) => {
-        const y = 350 - mv * 6;
+    const ticks = [0, 1, 2, 3, 4].map((tick) => {
+        const mv = tick * maximumMillivolts / 4;
+        const y = 350 - mv * pixelsPerMillivolt;
         return `<line x1="80" y1="${y}" x2="880" y2="${y}" stroke="#e5e7eb"/><text x="65" y="${y + 5}" text-anchor="end">${mv}</text>`;
     }).join("");
     const times = [0, 10, 20, 30, 40, 50].map((us) => `<text x="${80 + us * 16}" y="378" text-anchor="middle">${us}</text>`).join("");
     return `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="450" viewBox="0 0 960 450">
 <rect width="960" height="450" fill="white"/>
 <g font-family="sans-serif" font-size="15" fill="#1f2937">
-<text x="480" y="30" text-anchor="middle" font-size="21">TPS54320 startup: first 50 µs</text>
+<text x="480" y="30" text-anchor="middle" font-size="21">TPS54320 startup: first 50 µs${samples.method ? ` (${samples.method})` : ""}</text>
 <text x="480" y="60" text-anchor="middle">12 V DC → TI switching model → 6.8 µH / 47 µF → 1.1 Ω</text>
 <text x="480" y="85" text-anchor="middle">Benchmark window; the 3.3 V rail has not settled yet.</text>
 ${ticks}${times}
