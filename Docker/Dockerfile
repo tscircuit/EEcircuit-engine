@@ -31,6 +31,7 @@ RUN apt-get update && apt-get -y install emscripten
 COPY ./run.sh /
 COPY ./hicum2_patch.sh /
 COPY ./transient-numerics.patch /
+COPY ./test-product-error.c /
 COPY ./command-input.patch /
 
 RUN chmod +x /run.sh
