@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="500" viewBox="0 0 1000 500">
+<rect width="1000" height="500" fill="white"/>
+<g font-family="sans-serif" font-size="16" fill="#1f2937">
+<text x="500" y="36" text-anchor="middle" font-size="24">Cascaded TI model startup: solver completion</text>
+<text x="500" y="68" text-anchor="middle">Input circuit · no external load · LMZM33602 timing resistor: 44.2 kΩ</text>
+<rect x="40" y="100" width="205" height="100" rx="8" fill="#f3f4f6" stroke="#9ca3af"/>
+<text x="142.5" y="140" text-anchor="middle" font-weight="bold">DC source</text>
+<text x="142.5" y="172" text-anchor="middle">24 V</text>
+<path d="M 245 150 h 34 l -7 -5 m 7 5 l -7 5" fill="none" stroke="#374151" stroke-width="2"/>
+<rect x="285" y="100" width="205" height="100" rx="8" fill="#f3f4f6" stroke="#9ca3af"/>
+<text x="387.5" y="140" text-anchor="middle" font-weight="bold">LMZM33602</text>
+<text x="387.5" y="172" text-anchor="middle">24 V → 12 V target</text>
+<path d="M 490 150 h 34 l -7 -5 m 7 5 l -7 5" fill="none" stroke="#374151" stroke-width="2"/>
+<rect x="530" y="100" width="205" height="100" rx="8" fill="#f3f4f6" stroke="#9ca3af"/>
+<text x="632.5" y="140" text-anchor="middle" font-weight="bold">TPS82130</text>
+<text x="632.5" y="172" text-anchor="middle">12 V → 5 V target</text>
+<path d="M 735 150 h 34 l -7 -5 m 7 5 l -7 5" fill="none" stroke="#374151" stroke-width="2"/>
+<rect x="775" y="100" width="205" height="100" rx="8" fill="#f3f4f6" stroke="#9ca3af"/>
+<text x="877.5" y="140" text-anchor="middle" font-weight="bold">TPS82084</text>
+<text x="877.5" y="172" text-anchor="middle">5 V → 1.2 V target</text>
+
+<text x="500" y="254" text-anchor="middle" font-size="24" fill="#b91c1c">Stopped at 0.100 µs of 100.000 µs</text>
+<path d="M 80 310 H 920" stroke="#d1d5db" stroke-width="12"/>
+<path d="M 80 310 H 80.842" stroke="#b91c1c" stroke-width="12"/>
+<circle cx="80.842" cy="310" r="7" fill="#b91c1c"/>
+<text x="80" y="345" text-anchor="middle">0 µs</text>
+<text x="920" y="345" text-anchor="middle">100 µs requested</text>
+<text x="500" y="390" text-anchor="middle" fill="#b91c1c">ngspice reported: Timestep too small</text>
+<text x="500" y="435" text-anchor="middle">The target voltages describe the circuit; they are not measured results.</text>
+<text x="500" y="466" text-anchor="middle">This short window checks convergence, not final output regulation.</text>
+</g></svg>

@@ -56,6 +56,7 @@ async function main() {
         await runCommand("npx", ["tsx", "test/test-package.ts", ...args]);
 
         await runCommand("npx", ["tsx", "test/test-lmzm33602-startup.ts"]);
+        await runCommand("npx", ["tsx", "test/test-cascaded-ti-startup.ts"]);
         await runCommand("npx", ["tsx", "test/test-behavioral-current-step-svg.ts"]);
         await runCommand("npx", ["tsx", "test/test-transient-numerics.ts"]);
         await runCommand("npx", ["tsx", "test/test-buck-startup.ts"]);
