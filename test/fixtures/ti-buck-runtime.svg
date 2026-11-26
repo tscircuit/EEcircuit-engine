@@ -20,10 +20,10 @@
 <path d="M 460 165 H 520 m -7 -5 l 7 5 -7 5"/>
 <path d="M 720 165 H 780 m -7 -5 l 7 5 -7 5"/>
 </g>
-<text x="500" y="282" text-anchor="middle" font-size="30">10.919 seconds median simulation time</text>
+<text x="500" y="282" text-anchor="middle" font-size="30">9.595 seconds median simulation time</text>
 <text x="500" y="321" text-anchor="middle">Completed 100.000 µs · 24,131 transient samples</text>
 <rect x="100" y="355" width="800" height="22" rx="5" fill="#e5e7eb"/>
-<rect x="100" y="355" width="436.764" height="22" rx="5" fill="#2563eb"/>
+<rect x="100" y="355" width="383.819" height="22" rx="5" fill="#2563eb"/>
 <text x="100" y="409" text-anchor="middle">0 s</text><text x="900" y="409" text-anchor="middle">20 s</text>
 <text x="500" y="459" text-anchor="middle">Bun 1.4.2 · darwin arm64</text>
 <text x="500" y="496" text-anchor="middle">Measured example; elapsed time varies by machine and concurrent work.</text>

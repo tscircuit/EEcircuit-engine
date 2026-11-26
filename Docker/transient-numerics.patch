@@ -1010,7 +1010,7 @@ diff --git a/src/maths/sparse/spproduct.h b/src/maths/sparse/spproduct.h
 new file mode 100644
 --- /dev/null
 +++ b/src/maths/sparse/spproduct.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,42 @@
 +#ifndef SP_PRODUCT_ERROR_H
 +#define SP_PRODUCT_ERROR_H
 +
@@ -1022,6 +1022,9 @@ new file mode 100644
 +{
 +    double product = x * y;
 +#ifdef __EMSCRIPTEN__
++    /* Multiplication by zero is exact; avoid the software FMA in that case. */
++    if (product == 0.0 && (x == 0.0 || y == 0.0))
++        return 0.0;
 +    /* WebAssembly has no scalar FMA instruction. Use Dekker's TwoProduct
 +     * (Ogita/Rump/Oishi, doi:10.1137/030601818, Algorithms 3.2 and 3.3).
 +     * These conservative bounds keep the splits finite and every nonzero
