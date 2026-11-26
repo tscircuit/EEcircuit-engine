@@ -1,0 +1,40 @@
+export function renderTiBuckRuntimeSvg({ medianSeconds, lastTimeSeconds, numPoints, environment }: {
+    medianSeconds: number;
+    lastTimeSeconds: number;
+    numPoints: number;
+    environment: string;
+}): string {
+    const maximumSeconds = Math.max(20, Math.ceil(medianSeconds / 5) * 5);
+    const elapsedWidth = medianSeconds / maximumSeconds * 800;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="580" viewBox="0 0 1000 580">
+<rect width="1000" height="580" fill="white"/>
+<g font-family="sans-serif" font-size="16" fill="#1f2937">
+<text x="500" y="38" text-anchor="middle" font-size="24">TI buck: simulation runtime benchmark</text>
+<text x="500" y="73" text-anchor="middle">Same existing TPS54320 circuit · first 100 µs · three completed runs</text>
+<g fill="#f3f4f6" stroke="#9ca3af">
+<rect x="40" y="115" width="160" height="100" rx="8"/>
+<rect x="260" y="115" width="200" height="100" rx="8"/>
+<rect x="520" y="115" width="200" height="100" rx="8"/>
+<rect x="780" y="115" width="180" height="100" rx="8"/>
+</g>
+<g text-anchor="middle">
+<text x="120" y="154" font-weight="bold">DC input</text><text x="120" y="185">12 V</text>
+<text x="360" y="154" font-weight="bold">TPS54320</text><text x="360" y="185">TI switching model</text>
+<text x="620" y="154" font-weight="bold">Output filter</text><text x="620" y="185">6.8 µH / 47 µF</text>
+<text x="870" y="154" font-weight="bold">Load</text><text x="870" y="185">1.1 Ω</text>
+</g>
+<g fill="none" stroke="#374151" stroke-width="2">
+<path d="M 200 165 H 260 m -7 -5 l 7 5 -7 5"/>
+<path d="M 460 165 H 520 m -7 -5 l 7 5 -7 5"/>
+<path d="M 720 165 H 780 m -7 -5 l 7 5 -7 5"/>
+</g>
+<text x="500" y="282" text-anchor="middle" font-size="30">${medianSeconds.toFixed(3)} seconds median simulation time</text>
+<text x="500" y="321" text-anchor="middle">Completed ${(lastTimeSeconds * 1e6).toFixed(3)} µs · ${numPoints.toLocaleString("en-US")} transient samples</text>
+<rect x="100" y="355" width="800" height="22" rx="5" fill="#e5e7eb"/>
+<rect x="100" y="355" width="${elapsedWidth.toFixed(3)}" height="22" rx="5" fill="#2563eb"/>
+<text x="100" y="409" text-anchor="middle">0 s</text><text x="900" y="409" text-anchor="middle">${maximumSeconds} s</text>
+<text x="500" y="459" text-anchor="middle">${environment}</text>
+<text x="500" y="496" text-anchor="middle">Measured example; elapsed time varies by machine and concurrent work.</text>
+<text x="500" y="535" text-anchor="middle">A runtime report, not a timing assertion or proof of settled 3.3 V regulation.</text>
+</g></svg>\n`;
+}
