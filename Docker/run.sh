@@ -80,6 +80,11 @@ git apply /command-input.patch || { echo "build: command input patch failed, sto
 
 git apply /transient-numerics.patch || { echo "build: transient numerics patch failed, stopping execution"; exit 1; }
 
+emcc /test-product-error.c -I./src/maths/sparse -O2 -ffp-contract=off \
+  -sENVIRONMENT=node -sSINGLE_FILE=1 -o /tmp/test-product-error.cjs \
+  || { echo "build: product residual test compilation failed"; exit 1; }
+node /tmp/test-product-error.cjs || { echo "build: product residual test failed"; exit 1; }
+
 ############################################
 
 echo -e "\n"

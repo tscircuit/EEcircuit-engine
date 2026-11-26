@@ -344,7 +344,8 @@ diff --git a/src/maths/ni/niiter.c b/src/maths/ni/niiter.c
 diff --git a/src/maths/sparse/sputils.c b/src/maths/sparse/sputils.c
 --- a/src/maths/sparse/sputils.c
 +++ b/src/maths/sparse/sputils.c
-@@ -1,3 +1,5 @@
+@@ -1,3 +1,6 @@
++#include "spproduct.h"
 +#include <math.h>
 +#include <string.h>
  /*
@@ -437,7 +438,7 @@ diff --git a/src/maths/sparse/sputils.c b/src/maths/sparse/sputils.c
 +        for (i = 0; i < system->count; i++) {
 +            RefineEntry entry = system->entries[i];
 +            double product = entry.coefficient * solution[entry.column];
-+            double product_error = fma(entry.coefficient, solution[entry.column], -product);
++            double product_error = spProductError(entry.coefficient, solution[entry.column]);
 +            double old = residual[entry.row], sum = old - product;
 +            double delta = sum - old;
 +            /* TwoSum plus the product residual retains cancellation error. */
@@ -942,3 +943,47 @@ diff --git a/src/spicelib/parser/ifeval.c b/src/spicelib/parser/ifeval.c
 
      for (i = 0; i < myTree->p.numVars; i++)
          if ((err = PTeval(myTree->derivs[i], gmin, &derivs[i], vals)) != OK) {
+diff --git a/src/maths/sparse/spproduct.h b/src/maths/sparse/spproduct.h
+new file mode 100644
+--- /dev/null
++++ b/src/maths/sparse/spproduct.h
+@@ -0,0 +1,39 @@
++#ifndef SP_PRODUCT_ERROR_H
++#define SP_PRODUCT_ERROR_H
++
++#include <float.h>
++#include <math.h>
++
++static double
++spProductError(double x, double y)
++{
++    double product = x * y;
++#ifdef __EMSCRIPTEN__
++    /* WebAssembly has no scalar FMA instruction. Use Dekker's TwoProduct
++     * (Ogita/Rump/Oishi, doi:10.1137/030601818, Algorithms 3.2 and 3.3).
++     * These conservative bounds keep the splits finite and every nonzero
++     * partial product normal. Retain FMA outside this range. */
++    const double minimum = scalbn(1.0, DBL_MIN_EXP / 2 + DBL_MANT_DIG);
++    const double maximum = scalbn(1.0, DBL_MAX_EXP / 2 - DBL_MANT_DIG);
++    const double splitter = scalbn(1.0, (DBL_MANT_DIG + 1) / 2) + 1.0;
++    double x_split, x_hi, x_lo, y_split, y_hi, y_lo;
++    double error1, error2, error3;
++
++    if (fabs(x) >= minimum && fabs(x) <= maximum &&
++        fabs(y) >= minimum && fabs(y) <= maximum) {
++        x_split = splitter * x;
++        x_hi = x_split - (x_split - x);
++        x_lo = x - x_hi;
++        y_split = splitter * y;
++        y_hi = y_split - (y_split - y);
++        y_lo = y - y_hi;
++        error1 = product - x_hi * y_hi;
++        error2 = error1 - x_lo * y_hi;
++        error3 = error2 - x_hi * y_lo;
++        return x_lo * y_lo - error3;
++    }
++#endif
++    return fma(x, y, -product);
++}
++
++#endif
