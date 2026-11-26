@@ -1,0 +1,48 @@
+export function renderLoadedPowerTreeSvg({ lastTimeSeconds, errorMessage }: {
+    lastTimeSeconds: number;
+    errorMessage: string;
+}): string {
+    const complete = lastTimeSeconds >= 100e-9 - 1e-20 && !errorMessage;
+    const color = complete ? "#166534" : "#b91c1c";
+    const progressX = 90 + Math.min(lastTimeSeconds / 100e-9, 1) * 820;
+    const status = `${complete ? "Completed" : "Stopped at"} ${(lastTimeSeconds * 1e9).toFixed(3)} ns of 100.000 ns`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="650" viewBox="0 0 1000 650">
+<rect width="1000" height="650" fill="white"/>
+<g font-family="sans-serif" font-size="15" fill="#1f2937">
+<text x="500" y="36" text-anchor="middle" font-size="24">Loaded TI power tree: comparator event regression</text>
+<text x="500" y="68" text-anchor="middle">Actual input circuit and requested loads · TI model equations retained</text>
+<g fill="#f3f4f6" stroke="#9ca3af">
+<rect x="30" y="173" width="120" height="95" rx="8"/>
+<rect x="200" y="160" width="200" height="120" rx="8"/>
+<rect x="450" y="160" width="200" height="120" rx="8"/>
+<rect x="730" y="95" width="235" height="105" rx="8"/>
+<rect x="730" y="240" width="235" height="105" rx="8"/>
+</g>
+<g text-anchor="middle">
+<text x="90" y="210" font-weight="bold">DC input</text><text x="90" y="241">24 V</text>
+<text x="300" y="192" font-weight="bold">LMZM33602</text>
+<text x="300" y="220">12 V target · 22 µF</text><text x="300" y="248">Timing resistor: 44.2 kΩ</text>
+<text x="550" y="192" font-weight="bold">TPS82130</text>
+<text x="550" y="220">5 V bus · 22 µF</text><text x="550" y="248">Soft start: 10 nF</text>
+<text x="847" y="125" font-weight="bold">TPS82084 → 1.2 V</text>
+<text x="847" y="154">22 µF · 0.5 ↔ 1 A load</text><text x="847" y="181">1 ns load edges</text>
+<text x="847" y="270" font-weight="bold">TPS82085 → 1.8 V</text>
+<text x="847" y="299">22 µF · 0.75 ↔ 1.5 A load</text><text x="847" y="326">1 ns load edges</text>
+</g>
+<g fill="none" stroke="#374151" stroke-width="2">
+<path d="M 150 220 H 200 m -7 -5 l 7 5 -7 5"/>
+<path d="M 400 220 H 450 m -7 -5 l 7 5 -7 5"/>
+<path d="M 650 220 H 690 V 147 H 730 m -7 -5 l 7 5 -7 5"/>
+<path d="M 690 220 V 292 H 730 m -7 -5 l 7 5 -7 5"/>
+</g>
+<text x="500" y="395" text-anchor="middle" font-size="25" fill="${color}">${status}</text>
+<path d="M 90 440 H 910" stroke="#d1d5db" stroke-width="12"/>
+<path d="M 90 440 H ${progressX.toFixed(3)}" stroke="${color}" stroke-width="12"/>
+<circle cx="${progressX.toFixed(3)}" cy="440" r="7" fill="${color}"/>
+<text x="90" y="476" text-anchor="middle">0 ns</text>
+<text x="910" y="476" text-anchor="middle">100 ns requested</text>
+<text x="500" y="523" text-anchor="middle" fill="${color}">${complete ? "The complete requested transient window was returned." : "ngspice aborted: Timestep too small"}</text>
+<text x="500" y="573" text-anchor="middle">This short window checks nearly simultaneous model events.</text>
+<text x="500" y="606" text-anchor="middle">Rail voltages above are design targets; settled regulation is not tested here.</text>
+</g></svg>\n`;
+}
