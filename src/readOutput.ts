@@ -68,7 +68,13 @@ export function readRawOutput(rawData: Uint8Array): RawResultType {
   log(header);
   log(param);
 
-  const view = new DataView(rawData.buffer, offset + 8);
+  const binaryStart = rawData.byteOffset + offset + 8;
+  const binaryEnd = rawData.byteOffset + rawData.byteLength;
+  const view = new DataView(
+    rawData.buffer,
+    binaryStart,
+    binaryEnd - binaryStart
+  );
 
   for (let i = 0; i < view.byteLength; i = i + 8) {
     const d = view.getFloat64(i, true);
