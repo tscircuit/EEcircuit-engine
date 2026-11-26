@@ -19,13 +19,13 @@
 <text x="877.5" y="140" text-anchor="middle" font-weight="bold">TPS82084</text>
 <text x="877.5" y="172" text-anchor="middle">5 V → 1.2 V target</text>
 
-<text x="500" y="254" text-anchor="middle" font-size="24" fill="#b91c1c">Stopped at 0.100 µs of 100.000 µs</text>
+<text x="500" y="254" text-anchor="middle" font-size="24" fill="#166534">Completed 100.000 µs of 100.000 µs</text>
 <path d="M 80 310 H 920" stroke="#d1d5db" stroke-width="12"/>
-<path d="M 80 310 H 80.842" stroke="#b91c1c" stroke-width="12"/>
-<circle cx="80.842" cy="310" r="7" fill="#b91c1c"/>
+<path d="M 80 310 H 920.000" stroke="#166534" stroke-width="12"/>
+<circle cx="920.000" cy="310" r="7" fill="#166534"/>
 <text x="80" y="345" text-anchor="middle">0 µs</text>
 <text x="920" y="345" text-anchor="middle">100 µs requested</text>
-<text x="500" y="390" text-anchor="middle" fill="#b91c1c">ngspice reported: Timestep too small</text>
+<text x="500" y="390" text-anchor="middle" fill="#166534">The requested transient window completed.</text>
 <text x="500" y="435" text-anchor="middle">The target voltages describe the circuit; they are not measured results.</text>
 <text x="500" y="466" text-anchor="middle">This short window checks convergence, not final output regulation.</text>
 </g></svg>

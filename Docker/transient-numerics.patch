@@ -254,19 +254,27 @@ diff --git a/src/xspice/icm/xtradev/pswitch/cfunc.mod b/src/xspice/icm/xtradev/p
 diff --git a/src/maths/ni/niiter.c b/src/maths/ni/niiter.c
 --- a/src/maths/ni/niiter.c
 +++ b/src/maths/ni/niiter.c
-@@ -32,4 +32,5 @@
+@@ -20,4 +20,7 @@
+ #include "ngspice/sperror.h"
+ #include "ngspice/fteext.h"
++#ifdef XSPICE
++#include "ngspice/mif.h"
++#endif
+
+ /* Limit the number of 'singular matrix' warnings */
+@@ -32,4 +35,5 @@
      int error, i, j;
 
 +    void *linear_system = NULL;
      int iterno = 0;
      int ipass = 0;
-@@ -86,4 +87,5 @@
+@@ -86,4 +90,5 @@
  #endif
                  FREE(OldCKTstate0);
 +                spFreeSystem(linear_system);
                  return (error);
              }
-@@ -100,7 +102,22 @@
+@@ -100,7 +105,22 @@
  #endif
                      FREE(OldCKTstate0);
 +                    spFreeSystem(linear_system);
@@ -289,31 +297,31 @@ diff --git a/src/maths/ni/niiter.c b/src/maths/ni/niiter.c
 +                }
              }
 
-@@ -142,4 +159,5 @@
+@@ -142,4 +162,5 @@
  #endif
                      FREE(OldCKTstate0);
 +                    spFreeSystem(linear_system);
                      return(error); /* can't handle these errors - pass up! */
                  }
-@@ -192,4 +210,5 @@
+@@ -192,4 +213,5 @@
  #endif
                          FREE(OldCKTstate0);
 +                        spFreeSystem(linear_system);
                          return(error);
                      }
-@@ -214,4 +233,5 @@
+@@ -214,4 +236,5 @@
  #endif
                      FREE(OldCKTstate0);
 +                    spFreeSystem(linear_system);
                      return(error);
                  }
-@@ -237,4 +257,5 @@
+@@ -237,4 +260,5 @@
  #endif
                      FREE(OldCKTstate0);
 +                    spFreeSystem(linear_system);
                      return(error);
                  }
-@@ -253,4 +274,9 @@
+@@ -253,4 +277,9 @@
              startTime = SPfrontEnd->IFseconds();
              SMPsolve(ckt->CKTmatrix, ckt->CKTrhs, ckt->CKTrhsSpare);
 +            if (linear_system) {
@@ -323,19 +331,37 @@ diff --git a/src/maths/ni/niiter.c b/src/maths/ni/niiter.c
 +            }
              ckt->CKTstat->STATsolveTime +=
                  SPfrontEnd->IFseconds() - startTime;
-@@ -282,4 +308,5 @@
+@@ -270,4 +299,17 @@
+
+             if (iterno > maxIter) {
++#ifdef XSPICE
++                /* At the minimum timestep, retry the accepted active set once
++                 * to separate comparator transitions from Newton iteration. */
++                if ((ckt->CKTmode & MODETRAN) && ckt->CKTdelta <= ckt->CKTdelmin &&
++                    g_mif_info.analogEventCount &&
++                    !g_mif_info.analogEventRetry) {
++                    g_mif_info.analogEventRetry = 1;
++                    g_mif_info.analogStepRevision++;
++                    ckt->CKTstat->STATnumIter += iterno;
++                    iterno = 0;
++                    continue;
++                }
++#endif
+                 ckt->CKTstat->STATnumIter += iterno;
+                 /* we don't use this info during transient analysis */
+@@ -282,4 +324,5 @@
                  }
                  FREE(OldCKTstate0);
 +                spFreeSystem(linear_system);
                  return(E_ITERLIM);
              }
-@@ -333,4 +360,5 @@
+@@ -333,4 +376,5 @@
                  ckt->CKTstat->STATnumIter += iterno;
                  FREE(OldCKTstate0);
 +                spFreeSystem(linear_system);
                  return(OK);
              }
-@@ -356,4 +384,5 @@
+@@ -356,4 +400,5 @@
  #endif
              FREE(OldCKTstate0);
 +            spFreeSystem(linear_system);
@@ -487,7 +513,7 @@ diff --git a/src/include/ngspice/spmatrix.h b/src/include/ngspice/spmatrix.h
 diff --git a/src/include/ngspice/mif.h b/src/include/ngspice/mif.h
 --- a/src/include/ngspice/mif.h
 +++ b/src/include/ngspice/mif.h
-@@ -74,6 +74,10 @@
+@@ -74,6 +74,12 @@
     char               *errmsg;    /* An error msg from a cm_... function */
     Mif_Bkpt_Info_t    breakpoint; /* Data used by dynamic breakpoints */
     Mif_Auto_Partial_t auto_partial; /* Flags to enable auto partial computations */
@@ -495,6 +521,8 @@ diff --git a/src/include/ngspice/mif.h b/src/include/ngspice/mif.h
 +    double analogRetryTime;
 +    /* NR/LTE rejection invalidates event brackets from that attempt. */
 +    unsigned analogStepRevision;
++    unsigned analogEventCount; /* Registered behavioral predicates. */
++    int analogEventRetry;      /* Final Newton retry with the accepted active set. */
  } Mif_Info_t;
 
 
@@ -509,15 +537,26 @@ diff --git a/src/spicelib/analysis/dctran.c b/src/spicelib/analysis/dctran.c
              fprintf(stderr,"\nError: Finding the operating point for transient simulation failed \n");
              CKTncDump(ckt);
              fprintf(stderr,"\n");
-@@ -276,6 +277,7 @@
+@@ -276,6 +277,8 @@
 
          /* Breakpoint stuff */
          /* Initialize the temporary breakpoint variables to infinity */
 +        g_mif_info.analogRetryTime = 1.0e30;
++        g_mif_info.analogEventRetry = 0;
          g_mif_info.breakpoint.current = 1.0e30;
          g_mif_info.breakpoint.last    = 1.0e30;
  #endif
-@@ -689,6 +691,7 @@
+@@ -372,6 +375,9 @@
+     /* end LTRA code addition */
+
+     error = CKTaccept(ckt);
++#ifdef XSPICE
++    g_mif_info.analogEventRetry = 0;
++#endif
+     /* check if current breakpoint is outdated; if so, clear */
+     if (ckt->CKTtime > ckt->CKTbreaks[0])
+         CKTclrBreak(ckt);
+@@ -689,6 +695,7 @@
  #ifdef XSPICE
 
          /* Initialize temporary breakpoint to infinity */
@@ -525,17 +564,18 @@ diff --git a/src/spicelib/analysis/dctran.c b/src/spicelib/analysis/dctran.c
          g_mif_info.breakpoint.current = 1.0e30;
 
          /* Add convergence problem reporting flags */
-@@ -723,6 +726,9 @@
+@@ -723,6 +730,10 @@
 
          /* If no convergence in Central solver step */
          if(converged != 0) {
 +#ifdef XSPICE
 +            g_mif_info.analogStepRevision++;
++            g_mif_info.analogEventRetry = 0;
 +#endif
 
  #ifndef SHARED_MODULE
              ckt->CKTtime = ckt->CKTtime -ckt->CKTdelta;
-@@ -749,6 +755,8 @@
+@@ -749,6 +760,8 @@
                 - new delta by difference between by retracted time and breakpoint */
 
          past_breakpoint:
@@ -544,7 +584,7 @@ diff --git a/src/spicelib/analysis/dctran.c b/src/spicelib/analysis/dctran.c
              ckt->CKTsaveDelta = ckt->CKTdelta;
              ckt->CKTtime -= ckt->CKTdelta;
              ckt->CKTdelta = g_mif_info.breakpoint.current - ckt->CKTtime;
-@@ -798,6 +806,11 @@
+@@ -798,6 +811,11 @@
                  UPDATE_STATS(DOING_TRAN);
                  return(error);
              }
@@ -556,13 +596,14 @@ diff --git a/src/spicelib/analysis/dctran.c b/src/spicelib/analysis/dctran.c
              if (newdelta > .9 * ckt->CKTdelta) {
  #if defined(XSPICE)
                  /* The timestep has succeeded.  XSPICE instances with
-@@ -885,6 +898,9 @@
+@@ -885,6 +903,10 @@
                  ckt->CKTstat->STATrejected ++;
  #else
                  redostep = 1;
 +#endif
 +#ifdef XSPICE
 +                g_mif_info.analogStepRevision++;
++                g_mif_info.analogEventRetry = 0;
  #endif
                  ckt->CKTdelta = newdelta;
  #ifdef STEPDEBUG
@@ -672,7 +713,7 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +                                       asrc_vals, NULL) != OK)
                  return(E_BADPARM);
 
-@@ -59,2 +63,256 @@
+@@ -59,2 +63,278 @@
      return(OK);
  }
 +
@@ -722,9 +763,20 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +               event->epoch == event->owner->ASRCeventEpoch &&
 +               ckt->CKTtime > event->time && isfinite(argument) &&
 +               isfinite(event->argument)) {
++        /* During Newton recovery, solve the accepted side before locating a
++         * crossing. Let accepted roots and coincident events settle normally. */
++        if (g_mif_info.analogEventRetry &&
++            event->owner->ASRCeventMode == ASRC_EVENT_NORMAL &&
++            event->argument != 0.0 && event->pending != ASRC_ROOT_COINCIDENT)
++            value = event->value;
 +        if (event->pending == ASRC_ROOT_LOCATED && event->rootTime == ckt->CKTtime)
 +            value = event->value;
 +        if (event->owner->ASRCeventMode == ASRC_EVENT_LOCATE) {
++            /* Another event can change the converged trajectory before this
++             * provisional root. Rebracket an already crossed predicate. */
++            if (g_mif_info.analogEventRetry && event->pending == ASRC_ROOT_LOCATED &&
++                ckt->CKTtime < event->rootTime && value != event->value)
++                event->pending = ASRC_ROOT_NONE;
 +            if (!event->pending && event->argument != 0.0 &&
 +                ((argument >= 0.0 && event->argument < 0.0) ||
 +                 (argument <= 0.0 && event->argument > 0.0))) {
@@ -828,6 +880,9 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +        event = TMALLOC(ASRCevent, 1);
 +        if (!event)
 +            return E_NOMEM;
++#ifdef XSPICE
++        g_mif_info.analogEventCount++;
++#endif
 +        event->node = node;
 +        event->owner = here;
 +        event->ckt = ckt;
@@ -861,6 +916,9 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +        ASRCevent *next = event->next;
 +        event->node->function = event->function;
 +        event->node->data = NULL;
++#ifdef XSPICE
++        g_mif_info.analogEventCount--;
++#endif
 +        FREE(event);
 +        event = next;
 +    }
@@ -923,8 +981,13 @@ diff --git a/src/spicelib/devices/asrc/asrcconv.c b/src/spicelib/devices/asrc/as
 +                return error;
 +            tolerance = ckt->CKTreltol * MAX(fabs(rhs), fabs(here->ASRCprev_value)) +
 +                (here->ASRCtype == ASRC_VOLTAGE ? ckt->CKTvoltTol : ckt->CKTabstol);
-+            if (fabs(rhs - here->ASRCprev_value) > tolerance)
++            if (fabs(rhs - here->ASRCprev_value) > tolerance) {
 +                ckt->CKTnoncon++;
++#ifdef XSPICE
++                if (g_mif_info.analogEventRetry)
++                    g_mif_info.analogRetryTime = MIN(g_mif_info.analogRetryTime, ckt->CKTtime);
++#endif
++            }
 +        }
 +    }
 +    return OK;
