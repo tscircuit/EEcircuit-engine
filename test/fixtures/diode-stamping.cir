@@ -1,0 +1,11 @@
+Diode conductance precision near a comparator threshold
+I1 0 node 1u
+D1 node 0 Dtest
+Vreference reference 0 0.023822732507520927
+Bcmp compare 0 V={V(node)>V(reference)?1:0}
+Rload compare 0 1k
+.model Dtest D(Is=1e-10 N=.1 Rs=.005)
+.save V(node) V(reference) V(compare)
+.options reltol=1e-12 vntol=1e-16 abstol=1e-22
+.tran 1n 2n UIC
+.end
