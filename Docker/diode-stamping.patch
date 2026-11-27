@@ -1,0 +1,208 @@
+diff --git a/src/maths/sparse/spdefs.h b/src/maths/sparse/spdefs.h
+--- a/src/maths/sparse/spdefs.h
++++ b/src/maths/sparse/spdefs.h
+@@ -446,6 +446,7 @@
+ {
+     RealNumber   Real;
+     RealNumber   Imag;
++    RealNumber   RealLow; /* Summation roundoff in the unfactored real coefficient. */
+     int          Row;
+     int          Col;
+     struct MatrixElement  *NextInRow;
+diff --git a/src/maths/sparse/spbuild.c b/src/maths/sparse/spbuild.c
+--- a/src/maths/sparse/spbuild.c
++++ b/src/maths/sparse/spbuild.c
+@@ -109,6 +109,7 @@
+             while (pElement != NULL)
+            {
+                 pElement->Real = 0.0;
++                pElement->RealLow = 0.0;
+                 pElement->Imag = 0.0;
+                 pElement = pElement->NextInCol;
+            }
+@@ -122,6 +123,7 @@
+             while (pElement != NULL)
+             {
+                 pElement->Real = 0.0;
++                pElement->RealLow = 0.0;
+                 pElement = pElement->NextInCol;
+             }
+         }
+@@ -129,6 +131,7 @@
+ 
+     /* Empty the trash. */
+     Matrix->TrashCan.Real = 0.0;
++    Matrix->TrashCan.RealLow = 0.0;
+     Matrix->TrashCan.Imag = 0.0;
+ 
+     Matrix->Error = spOKAY;
+@@ -783,6 +786,7 @@
+         pElement->Row = Row;
+         pElement->Col = Col;
+         pElement->Real = 0.0;
++        pElement->RealLow = 0.0;
+         pElement->Imag = 0.0;
+ #if INITIALIZE
+         pElement->pInitInfo = NULL;
+@@ -842,6 +846,7 @@
+         pElement->Col = Col;
+ #endif
+         pElement->Real = 0.0;
++        pElement->RealLow = 0.0;
+         pElement->Imag = 0.0;
+ #if INITIALIZE
+         pElement->pInitInfo = NULL;
+@@ -1151,6 +1156,7 @@
+         Col = Matrix->IntToExtColMap[J];
+         while (pElement != NULL)
+         {
++            pElement->RealLow = 0.0;
+             if (pElement->pInitInfo == NULL)
+             {
+                 pElement->Real = 0.0;
+@@ -1173,6 +1179,7 @@
+ 
+     /* Empty the trash. */
+     Matrix->TrashCan.Real = 0.0;
++    Matrix->TrashCan.RealLow = 0.0;
+     Matrix->TrashCan.Imag = 0.0;
+ 
+     Matrix->Error = spOKAY;
+@@ -1183,3 +1190,16 @@
+     return 0;
+ }
+ #endif /* INITIALIZE */
++
++/* Retain small device conductances when they are added to large coefficients.
++ * spSaveSystem includes this low part in the refinement residual. The element
++ * pointer returned by spGetElement addresses MatrixElement's first member. */
++void spAddReal(double *pointer, double increment)
++{
++    ElementPtr element = (ElementPtr)pointer;
++    double before = element->Real;
++    double sum = before + increment;
++    double delta = sum - before;
++    element->RealLow += (before - (sum - delta)) + (increment - delta);
++    element->Real = sum;
++}
+diff --git a/src/maths/sparse/sputils.c b/src/maths/sparse/sputils.c
+--- a/src/maths/sparse/sputils.c
++++ b/src/maths/sparse/sputils.c
+@@ -2230,9 +2230,10 @@
+     /* The external numbering can contain gaps after circuit unsetup. */
+     system->size = spGetSize(matrix, 1);
+     for (column = 1; column <= matrix->Size; column++)
+-        for (element = matrix->FirstInCol[column]; element; element = element->NextInCol)
+-            if (element->Real != 0.0)
+-                count++;
++        for (element = matrix->FirstInCol[column]; element; element = element->NextInCol) {
++            if (element->Real != 0.0) count++;
++            if (element->RealLow != 0.0) count++;
++        }
+     system->entries = calloc((size_t)count + 1, sizeof(*system->entries));
+     system->vectors = calloc((size_t)system->size + 1, 4 * sizeof(double));
+     if (!system->entries || !system->vectors) {
+@@ -2248,6 +2249,12 @@
+                 entry->row = matrix->IntToExtRowMap[element->Row];
+                 entry->column = matrix->IntToExtColMap[column];
+                 entry->coefficient = element->Real;
++            }
++            if (element->RealLow != 0.0) {
++                RefineEntry *entry = &system->entries[count++];
++                entry->row = matrix->IntToExtRowMap[element->Row];
++                entry->column = matrix->IntToExtColMap[column];
++                entry->coefficient = element->RealLow;
+             }
+         }
+     }
+diff --git a/src/include/ngspice/spmatrix.h b/src/include/ngspice/spmatrix.h
+--- a/src/include/ngspice/spmatrix.h
++++ b/src/include/ngspice/spmatrix.h
+@@ -297,6 +297,7 @@
+ extern  void     spMultiply( MatrixPtr, spREAL*, spREAL*, spREAL*, spREAL* );
+ extern  void     spMultTransposed(MatrixPtr,spREAL*,spREAL*,spREAL*,spREAL*);
+ extern  void     spSolve( MatrixPtr, spREAL*, spREAL*, spREAL*, spREAL* );
++extern  void     spAddReal(double *, double);
+ extern  void*    spSaveSystem(MatrixPtr, double*);
+ extern  void     spFreeSystem(void*);
+ extern  void     spRefineSystem(MatrixPtr, void*, double*);
+diff --git a/src/spicelib/devices/dio/dioload.c b/src/spicelib/devices/dio/dioload.c
+--- a/src/spicelib/devices/dio/dioload.c
++++ b/src/spicelib/devices/dio/dioload.c
+@@ -22,6 +22,12 @@
+ {
+     DIOmodel *model = (DIOmodel*)inModel;
+     DIOinstance *here;
++    const int compensate_stamps = (ckt->CKTmode & MODETRAN) &&
++        ckt->CKTdiagGmin == 0.0 &&
++#ifdef KLU
++        !ckt->CKTkluMODE &&
++#endif
++        !ckt->CKTsenInfo;
+     double arg;
+     double argsw;
+     double capd, capdsw=0.0;
+@@ -806,13 +812,24 @@
+             /*
+              *   load matrix
+              */
+-            *(here->DIOposPosPtr) += gspr;
+-            *(here->DIOnegNegPtr) += gd;
+-            *(here->DIOposPrimePosPrimePtr) += (gd + gspr);
+-            *(here->DIOposPosPrimePtr) -= gspr;
+-            *(here->DIOnegPosPrimePtr) -= gd;
+-            *(here->DIOposPrimePosPtr) -= gspr;
+-            *(here->DIOposPrimeNegPtr) -= gd;
++            if (compensate_stamps) {
++                spAddReal(here->DIOposPosPtr, gspr);
++                spAddReal(here->DIOnegNegPtr, gd);
++                spAddReal(here->DIOposPrimePosPrimePtr, gd);
++                spAddReal(here->DIOposPrimePosPrimePtr, gspr);
++                spAddReal(here->DIOposPosPrimePtr, -gspr);
++                spAddReal(here->DIOnegPosPrimePtr, -gd);
++                spAddReal(here->DIOposPrimePosPtr, -gspr);
++                spAddReal(here->DIOposPrimeNegPtr, -gd);
++            } else {
++                *(here->DIOposPosPtr) += gspr;
++                *(here->DIOnegNegPtr) += gd;
++                *(here->DIOposPrimePosPrimePtr) += (gd + gspr);
++                *(here->DIOposPosPrimePtr) -= gspr;
++                *(here->DIOnegPosPrimePtr) -= gd;
++                *(here->DIOposPrimePosPtr) -= gspr;
++                *(here->DIOposPrimeNegPtr) -= gd;
++            }
+             if (selfheat) {
+                 (*(here->DIOtempPosPtr)      += -dIth_dVrs);
+                 (*(here->DIOtempPosPrimePtr) += -dIth_dVdio + dIth_dVrs);
+@@ -823,13 +840,24 @@
+                 (*(here->DIOnegTempPtr)      += -dIdio_dT);
+             }
+             if (model->DIOresistSWGiven) {
+-                *(here->DIOposPosPtr) += gsprsw;
+-                *(here->DIOnegNegPtr) += gdsw;
+-                *(here->DIOposSwPrimePosSwPrimePtr) += (gdsw + gsprsw);
+-                *(here->DIOposPosSwPrimePtr) -= gsprsw;
+-                *(here->DIOnegPosSwPrimePtr) -= gdsw;
+-                *(here->DIOposSwPrimePosPtr) -= gsprsw;
+-                *(here->DIOposSwPrimeNegPtr) -= gdsw;
++                if (compensate_stamps) {
++                    spAddReal(here->DIOposPosPtr, gsprsw);
++                    spAddReal(here->DIOnegNegPtr, gdsw);
++                    spAddReal(here->DIOposSwPrimePosSwPrimePtr, gdsw);
++                    spAddReal(here->DIOposSwPrimePosSwPrimePtr, gsprsw);
++                    spAddReal(here->DIOposPosSwPrimePtr, -gsprsw);
++                    spAddReal(here->DIOnegPosSwPrimePtr, -gdsw);
++                    spAddReal(here->DIOposSwPrimePosPtr, -gsprsw);
++                    spAddReal(here->DIOposSwPrimeNegPtr, -gdsw);
++                } else {
++                    *(here->DIOposPosPtr) += gsprsw;
++                    *(here->DIOnegNegPtr) += gdsw;
++                    *(here->DIOposSwPrimePosSwPrimePtr) += (gdsw + gsprsw);
++                    *(here->DIOposPosSwPrimePtr) -= gsprsw;
++                    *(here->DIOnegPosSwPrimePtr) -= gdsw;
++                    *(here->DIOposSwPrimePosPtr) -= gsprsw;
++                    *(here->DIOposSwPrimeNegPtr) -= gdsw;
++                }
+ 
+                 if (selfheat) {
+                     (*(here->DIOtempPosPtr)        += -dIth_dVrssw);

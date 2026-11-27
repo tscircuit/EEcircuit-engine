@@ -37,6 +37,26 @@ async function main(): Promise<void> {
     if (process.env.UPDATE_SNAPSHOTS === "1") await writeFile(snapshotUrl, svg);
     const comparison = await looksSame(Buffer.from(svg), Buffer.from(await readFile(snapshotUrl, "utf8")));
     assert(comparison.equal, "Loaded TI power tree SVG mismatch; use UPDATE_SNAPSHOTS=1 to regenerate");
+
+    // Both limits previously caused comparator chatter and an early abort.
+    for (const maximumStep of ["0.5n", "2n"]) {
+        const changedStep = netList.replace(/\.tran 1n 10u UIC/i, `.tran 1n 10u 0 ${maximumStep} UIC`);
+        assert.notEqual(changedStep, netList, "Maximum-step variant did not change the netlist");
+        sim.setNetList(changedStep);
+        const variant = await sim.runSim();
+        assert.equal(variant.dataType, "real");
+        const timeSeconds = variant.data.find((vector) => vector.type === "time")?.values;
+        const out12Volts = variant.data.find((vector) => vector.name === "v(out12)")?.values;
+        const out18Volts = variant.data.find((vector) => vector.name === "v(out18)")?.values;
+        assert(timeSeconds && out12Volts && out18Volts);
+        assert(variant.data.every((vector) => vector.values.every(Number.isFinite)));
+        assert(Math.abs(timeSeconds.at(-1)! - 10e-6) < 1e-18, `Power tree stopped with maxstep=${maximumStep}`);
+        assert(!sim.getError().some((message) => /too small|aborted|fatal/i.test(message)));
+        const comparison = compareLoadedPowerTree({ timeSeconds, out12Volts, out18Volts }, reference);
+        assert.equal(comparison.comparedPoints, 200);
+        assert(comparison.maximumErrorVolts <= reference.maximumErrorVolts,
+            `Power tree with maxstep=${maximumStep} differs from native by ${comparison.maximumErrorVolts} V`);
+    }
     console.log("Loaded TI power tree visual regression passed");
 }
 

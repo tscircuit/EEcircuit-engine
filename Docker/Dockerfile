@@ -32,6 +32,7 @@ COPY ./run.sh /
 COPY ./hicum2_patch.sh /
 COPY ./transient-numerics.patch /
 COPY ./lte-minimum-step.patch /
+COPY ./diode-stamping.patch /
 COPY ./test-product-error.c /
 COPY ./command-input.patch /
 
