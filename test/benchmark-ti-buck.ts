@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { Simulation } from "../src/simulationLink.ts";
 import { renderTiBuckRuntimeSvg } from "./fixtures/renderTiBuckRuntimeSvg.ts";
 import { sampleTiBuckTrace } from "./fixtures/sampleTiBuckTrace.ts";
@@ -59,29 +56,9 @@ async function main(): Promise<void> {
     assert(Math.abs(trace.meanOutputVolts.at(-1)! - 3.3) < 0.1, "Buck output did not regulate near 3.3 V");
 }
 
-if (!process.argv.includes("--simulation-child")) {
-    // A parent process can interrupt a synchronous WASM loop; an in-process timer cannot.
-    try {
-        execFileSync(process.execPath, [...process.execArgv, fileURLToPath(import.meta.url), "--simulation-child"], {
-            stdio: "inherit", timeout: 3_600_000,
-        });
-    } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ETIMEDOUT") throw error;
-        const reference = JSON.parse(readFileSync(new URL("./fixtures/ti-buck-startup.native.json", import.meta.url), "utf8"));
-        if (process.env.UPDATE_SNAPSHOTS === "1") {
-            const svg = renderTiBuckRuntimeSvg({
-                elapsedSeconds: 3600, numPoints: 0, reference,
-                environment: `Node ${process.versions.node} · ${process.platform} ${process.arch}`,
-            });
-            writeFileSync(new URL("./fixtures/ti-buck-runtime.svg", import.meta.url), svg);
-        }
-        console.log("TI buck benchmark returned no result within 60 minutes");
-    }
-} else {
-    // Keep a pending bridge promise alive; the parent enforces the deadline.
-    const timeout = setTimeout(() => process.exit(1), 3_660_000);
-    main().then(() => { clearTimeout(timeout); process.exit(0); }).catch((error) => {
-        console.error(error);
-        process.exit(1);
-    });
-}
+// This opt-in benchmark waits for the complete run, including a pending bridge promise.
+const keepAlive = setInterval(() => {}, 1000);
+main().then(() => { clearInterval(keepAlive); process.exit(0); }).catch((error) => {
+    console.error(error);
+    process.exit(1);
+});
