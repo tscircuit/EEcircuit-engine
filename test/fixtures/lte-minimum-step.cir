@@ -1,0 +1,9 @@
+RC response after a fast comparator input edge
+Vcontrol control 0 PULSE(0 1 10u .4f .4f 1u 30u)
+Bdrive drive 0 V={V(control)>.5 ?1:0}
+R1 drive output 1
+C1 output 0 1n
+.save V(control) V(output)
+.options reltol=1e-5 vntol=1e-8 abstol=1e-14 chgtol=1e-16
+.tran 125n 12u 0 125n UIC
+.end
