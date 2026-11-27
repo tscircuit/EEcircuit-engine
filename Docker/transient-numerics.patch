@@ -1068,7 +1068,7 @@ diff --git a/src/maths/sparse/spproduct.h b/src/maths/sparse/spproduct.h
 new file mode 100644
 --- /dev/null
 +++ b/src/maths/sparse/spproduct.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,45 @@
 +#ifndef SP_PRODUCT_ERROR_H
 +#define SP_PRODUCT_ERROR_H
 +
@@ -1084,11 +1084,17 @@ new file mode 100644
 +     * (Ogita/Rump/Oishi, doi:10.1137/030601818, Algorithms 3.2 and 3.3).
 +     * These conservative bounds keep the splits finite and every nonzero
 +     * partial product normal. Retain FMA outside this range. */
-+    const double minimum = scalbn(1.0, DBL_MIN_EXP / 2 + DBL_MANT_DIG);
-+    const double maximum = scalbn(1.0, DBL_MAX_EXP / 2 - DBL_MANT_DIG);
-+    const double splitter = scalbn(1.0, (DBL_MANT_DIG + 1) / 2) + 1.0;
++    /* Exact binary64 bounds and splitter; avoid repeated scalbn calls. */
++    const double minimum = 0x1p-457; /* 2^(DBL_MIN_EXP/2 + DBL_MANT_DIG) */
++    const double maximum = 0x1p459;  /* 2^(DBL_MAX_EXP/2 - DBL_MANT_DIG) */
++    const double splitter = 134217729.0; /* 2^27 + 1 */
 +    double x_split, x_hi, x_lo, y_split, y_hi, y_lo;
 +    double error1, error2, error3;
++
++    /* Multiplication by zero or a unit value has no rounding residual. */
++    if (isfinite(product) &&
++        (x == 0.0 || y == 0.0 || fabs(x) == 1.0 || fabs(y) == 1.0))
++        return 0.0;
 +
 +    if (fabs(x) >= minimum && fabs(x) <= maximum &&
 +        fabs(y) >= minimum && fabs(y) <= maximum) {
