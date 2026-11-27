@@ -79,6 +79,7 @@ cp /hicum2_patch.sh ./hicum2_patch.sh
 git apply /command-input.patch || { echo "build: command input patch failed, stopping execution"; exit 1; }
 
 git apply /transient-numerics.patch || { echo "build: transient numerics patch failed, stopping execution"; exit 1; }
+git apply /lte-minimum-step.patch || { echo "build: minimum timestep patch failed, stopping execution"; exit 1; }
 
 emcc /test-product-error.c -I./src/maths/sparse -O2 -ffp-contract=off \
   -sENVIRONMENT=node -sSINGLE_FILE=1 -o /tmp/test-product-error.cjs \
