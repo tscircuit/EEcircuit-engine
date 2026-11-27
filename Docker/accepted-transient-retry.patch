@@ -1,53 +1,35 @@
 --- a/src/include/ngspice/cktdefs.h
 +++ b/src/include/ngspice/cktdefs.h
-@@ -119,6 +119,10 @@
-     double *CKTrhsOld;          /* previous rhs value for convergence
-                                    testing */
+@@ -121,2 +121,6 @@
      double *CKTrhsSpare;        /* spare rhs value for reordering */
 +    double *CKTrhsAccepted;     /* last accepted transient solution,
 +                                   the starting point of a retry */
 +    int CKTrhsSize;             /* length of the rhs vectors less one,
 +                                   as allocated by NIreinit */
      double *CKTirhs;            /* current rhs value - being loaded
-                                    (imag) */
-     double *CKTirhsOld;         /* previous rhs value (imaginary)*/
 --- a/src/maths/ni/nidest.c
 +++ b/src/maths/ni/nidest.c
-@@ -22,6 +22,7 @@
-     if(ckt->CKTrhs)         FREE(ckt->CKTrhs);
-     if(ckt->CKTrhsOld)      FREE(ckt->CKTrhsOld);
+@@ -24,2 +24,3 @@
      if(ckt->CKTrhsSpare)    FREE(ckt->CKTrhsSpare);
 +    if(ckt->CKTrhsAccepted) FREE(ckt->CKTrhsAccepted);
      if(ckt->CKTirhs)        FREE(ckt->CKTirhs);
-     if(ckt->CKTirhsOld)     FREE(ckt->CKTirhsOld);
-     if(ckt->CKTirhsSpare)   FREE(ckt->CKTirhsSpare);
 --- a/src/maths/ni/nireinit.c
 +++ b/src/maths/ni/nireinit.c
-@@ -37,6 +37,8 @@
-     CKALLOC(CKTrhs,size+1,double);
-     CKALLOC(CKTrhsOld,size+1,double);
+@@ -39,2 +39,4 @@
      CKALLOC(CKTrhsSpare,size+1,double);
 +    CKALLOC(CKTrhsAccepted,size+1,double);
 +    ckt->CKTrhsSize = size;
      CKALLOC(CKTirhs,size+1,double);
-     CKALLOC(CKTirhsOld,size+1,double);
-     CKALLOC(CKTirhsSpare,size+1,double);
 --- a/src/spicelib/analysis/dctran.c
 +++ b/src/spicelib/analysis/dctran.c
-@@ -376,6 +376,10 @@
-     /* end LTRA code addition */
- 
+@@ -378,2 +378,6 @@
      error = CKTaccept(ckt);
 +    /* Keep the accepted solution for retries after non-convergence. */
 +    if (ckt->CKTrhsAccepted)
 +        memcpy(ckt->CKTrhsAccepted, ckt->CKTrhs,
 +               (size_t) (ckt->CKTrhsSize + 1) * sizeof(double));
  #ifdef XSPICE
-     g_mif_info.analogEventRetry = 0;
- #endif
-@@ -744,6 +748,16 @@
-             redostep = 1;
- #endif
+@@ -746,2 +750,12 @@
              ckt->CKTdelta = ckt->CKTdelta/8;
 +            /* Retry from the last accepted solution, not from the failed
 +               attempt's last iterate. Built-in semiconductors predict their
@@ -60,5 +42,3 @@
 +                memcpy(ckt->CKTrhsOld, ckt->CKTrhsAccepted,
 +                       (size_t) (ckt->CKTrhsSize + 1) * sizeof(double));
  #ifdef STEPDEBUG
-             (void)printf("delta cut to %g for non-convergence\n",ckt->CKTdelta);
-             fflush(stdout);
