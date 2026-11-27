@@ -1,0 +1,80 @@
+* Accepted-solution retry regression (ngspice upstream bug 879)
+* Newton iterate. Upstream circuit by Steven Franklin:
+* https://sourceforge.net/p/ngspice/bugs/879/
+*     Timestep too small; time = 0.0370052, timestep = 1.25e-16: trouble with node "n5"
+* With retry-from-accepted.patch it runs the whole 2 s (about 2 s wall).
+* A fragment of a valve guitar amplifier: a 12AX7 driven hard (12 V peak at 200 Hz) into a
+* direct-coupled 12AX7 and a 12AT7 long-tailed pair. Cut down automatically from the whole
+* amplifier, keeping only cuts that left every node a DC path to ground and still stopped
+* stock 47 mid-run. Some resistors that remain carry no current; removing any one of them
+* moves or removes the stop, because which step first runs away is a matter of rounding.
+* Drive levels: 12 and 16 V peak stop on stock 47; 2-10 V run.
+C17 n5 n7 1e-07
+C18 n8 n9 4.7e-08
+R15_a 0 n31x 16263.7
+R17 n1 0 2200
+R18 n18 n3 100000
+R19 n2 0 2200
+R20 n20 n3 1000000
+R22 n18 n28 220000
+R23 n34 input_sig 68000
+R28 n38 0 100000
+R29 n7 n38 1000000
+R3 input_sig 0 1000000
+R30 n39 n5 22000
+R32 n5 0 2200
+R33 h_t__3 n8 82000
+R34 h_t__3 n10 91000
+R36 n41 n9 22000
+R39 n44 n9 100000
+R4 n45 input_sig 68000
+R43 n46 n49 100
+R46 n16 n51 100
+R47 n15 n16 220000
+R5_a 0 n53 96342
+R5_b n53 n12 373658
+R51 n16 n46 470
+R52 n16 h_t__3 1000
+R53 h_t__3 n17 22000
+R54 n17 n18 10000
+R6 n36 n53 470000
+R7 n56 0 1000
+R8 n17 n23 100000
+R_T1_a n57 _t1_a 42.5
+L_T1_a _t1_a n58 5
+L_T1_b n58 _t1_b 5
+R_T1_b _t1_b n59 42.5
+R_T1_x n52 _t1_x 0.12
+L_T1_x _t1_x out 0.01378125
+R_T1_y out _t1_y 0.38
+L_T1_y _t1_y 0 0.0845
+X_U3 n3 n31 n1 TRIODE12AX7
+X_U4 n18 n20 n38 TRIODE12AX7
+X_U5 n10 n7 n39 TRIODE12AT7
+X_U6 n8 n38 n39 TRIODE12AT7
+X_V1 n23 n36 n56 TRIODE12AX7
+V10 n58 0 dc 460
+V11 n51 0 dc 460
+V9 n44 0 dc -38
+.model SW_SPST sw vt=0.5 vh=0.1 ron=0.01 roff=1e9
+V_Dn31 n31 0 SIN(0 12 200.0)
+.SUBCKT TRIODE12AX7 P G K
+BX X 0 V = min(632.4*(1/106.7 + V(G,K)/sqrt(9795 + V(P,K)*V(P,K))), 20)
+BE E 0 V = (V(P,K)/632.4) * ln(1 + exp(V(X)))
+BIP P K I = 2*pow(max(V(E),0), 1.127)/876.8
+.MODEL DGRID D(IS=3.53e-13 N=3.233)
+.ENDS
+.SUBCKT TRIODE12AT7 P G K
+BX X 0 V = min(223.1*(1/83.72 + V(G,K)/sqrt(6287 + V(P,K)*V(P,K))), 20)
+BE E 0 V = (V(P,K)/223.1) * ln(1 + exp(V(X)))
+BIP P K I = 2*pow(max(V(E),0), 1.209)/317.1
+CPK P K 0.45p
+BIG G K I = 1.477e-3*pow((max(5.802*V(G,K),0) + ln(1 + exp(-abs(5.802*V(G,K)))))/5.802, 1.594)
+.ENDS
+.SUBCKT PENTODEEL34AB P G2 G1 K G3
+.MODEL DGRID D(IS=1n RS=1)
+.ENDS
+.options method=gear
+.save n5 n31
+.tran 1e-4 2 0 1e-4
+.end
