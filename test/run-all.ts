@@ -61,6 +61,7 @@ async function main() {
         await runCommand("npx", ["tsx", "test/test-behavioral-current-step-svg.ts"]);
         await runCommand("npx", ["tsx", "test/test-transient-numerics.ts"]);
         await runCommand("npx", ["tsx", "test/test-lte-minimum-step.ts"]);
+        await runCommand("npx", ["tsx", "test/test-diode-stamping.ts"]);
         await runCommand("npx", ["tsx", "test/test-buck-startup.ts"]);
         await runCommand("npx", ["tsx", "test/test-command-input-boundary.ts"]);
 
