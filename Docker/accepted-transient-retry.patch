@@ -1,0 +1,44 @@
+--- a/src/include/ngspice/cktdefs.h
++++ b/src/include/ngspice/cktdefs.h
+@@ -121,2 +121,6 @@
+     double *CKTrhsSpare;        /* spare rhs value for reordering */
++    double *CKTrhsAccepted;     /* last accepted transient solution,
++                                   the starting point of a retry */
++    int CKTrhsSize;             /* length of the rhs vectors less one,
++                                   as allocated by NIreinit */
+     double *CKTirhs;            /* current rhs value - being loaded
+--- a/src/maths/ni/nidest.c
++++ b/src/maths/ni/nidest.c
+@@ -24,2 +24,3 @@
+     if(ckt->CKTrhsSpare)    FREE(ckt->CKTrhsSpare);
++    if(ckt->CKTrhsAccepted) FREE(ckt->CKTrhsAccepted);
+     if(ckt->CKTirhs)        FREE(ckt->CKTirhs);
+--- a/src/maths/ni/nireinit.c
++++ b/src/maths/ni/nireinit.c
+@@ -39,2 +39,4 @@
+     CKALLOC(CKTrhsSpare,size+1,double);
++    CKALLOC(CKTrhsAccepted,size+1,double);
++    ckt->CKTrhsSize = size;
+     CKALLOC(CKTirhs,size+1,double);
+--- a/src/spicelib/analysis/dctran.c
++++ b/src/spicelib/analysis/dctran.c
+@@ -378,2 +378,6 @@
+     error = CKTaccept(ckt);
++    /* Keep the accepted solution for retries after non-convergence. */
++    if (ckt->CKTrhsAccepted)
++        memcpy(ckt->CKTrhsAccepted, ckt->CKTrhs,
++               (size_t) (ckt->CKTrhsSize + 1) * sizeof(double));
+ #ifdef XSPICE
+@@ -746,2 +750,12 @@
+             ckt->CKTdelta = ckt->CKTdelta/8;
++            /* Retry from the last accepted solution, not from the failed
++               attempt's last iterate. Built-in semiconductors predict their
++               junction voltages from their states in MODEINITPRED, but
++               B sources (asrcload.c) and other devices without a
++               predictor read CKTrhsOld directly: an iterate that ran
++               away, to NaN or far off, would poison every retry, down
++               to "timestep too small". */
++            if (ckt->CKTrhsAccepted)
++                memcpy(ckt->CKTrhsOld, ckt->CKTrhsAccepted,
++                       (size_t) (ckt->CKTrhsSize + 1) * sizeof(double));
+ #ifdef STEPDEBUG
