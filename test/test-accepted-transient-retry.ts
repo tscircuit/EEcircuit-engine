@@ -20,14 +20,14 @@ async function main(): Promise<void> {
     assert(timeSeconds && inputVolts && nodeVolts);
     assert(result.data.every((vector) => vector.values.every(Number.isFinite)));
     assert(inputVolts.every((volts, index) => Math.abs(volts - 12 * Math.sin(2 * Math.PI * 200 * timeSeconds[index])) < 1e-10));
-    assert(timeSeconds.at(-1)! < 2, "Repro unexpectedly completed; update the failure assertion with the fix");
-    assert(sim.getError().some((message) => /timestep too small/i.test(message)));
+    assert(Math.abs(timeSeconds.at(-1)! - 2) < 1e-12, "Transient retry did not reach 2 s");
+    assert(!sim.getError().some((message) => /too small|aborted|fatal/i.test(message)));
     const svg = renderAcceptedTransientRetrySvg({ timeSeconds, inputVolts, nodeVolts });
     const snapshotUrl = new URL("./fixtures/accepted-transient-retry.expected.svg", import.meta.url);
     if (process.env.UPDATE_SNAPSHOTS === "1") await writeFile(snapshotUrl, svg);
     const comparison = await looksSame(Buffer.from(svg), Buffer.from(await readFile(snapshotUrl, "utf8")));
     assert(comparison.equal, "Accepted-solution retry snapshot changed; regenerate with UPDATE_SNAPSHOTS=1");
-    console.log("Accepted-solution retry repro passed");
+    console.log("Accepted-solution retry regression passed");
 }
 
 if (process.argv.includes("--simulation-child")) {
